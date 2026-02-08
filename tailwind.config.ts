@@ -11,6 +11,15 @@ export default {
   ],
   theme: {
     extend: {
+      borderRadius: {
+        sm: '0.125rem',
+        DEFAULT: '0.125rem',
+        md: '0.125rem',
+        lg: '0.125rem',
+        xl: '0.125rem',
+        '2xl': '0.125rem',
+        '3xl': '0.125rem',
+      },
       colors: {
         primary: {
           50: '#fbe9e7',

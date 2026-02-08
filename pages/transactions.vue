@@ -16,7 +16,6 @@ const {
   totalPages,
   statusCounts,
   updateTransactionStatus,
-  exportCSV,
 } = useTransactions()
 
 const showPayoutReview = ref(false)
@@ -143,13 +142,6 @@ function getRowActions(tx: Transaction) {
         <h1 class="text-2xl font-bold text-gray-900">Payout Review Queue</h1>
         <p class="text-sm text-gray-500 mt-1">Review and approve withdrawal requests with AI-powered risk analysis</p>
       </div>
-      <button
-        class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-        @click="exportCSV"
-      >
-        <Icon icon="lucide:download" class="w-4 h-4" />
-        Export CSV
-      </button>
     </div>
 
     <!-- Status Filter Tabs -->
