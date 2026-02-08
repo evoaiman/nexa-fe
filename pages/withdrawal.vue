@@ -24,19 +24,34 @@ const withdrawalMethods: WithdrawalMethod[] = [
 ]
 
 const accounts = [
-  { id: 'MT5-001', label: 'MT5 - Live #001', balance: 12450.00 },
-  { id: 'MT5-002', label: 'MT5 - Live #002', balance: 3200.50 },
-  { id: 'MT4-001', label: 'MT4 - Standard #001', balance: 890.25 },
+  { id: 'CUST-001', label: 'Sarah Chen (GBR)', balance: 12450.00 },
+  { id: 'CUST-002', label: 'James Wilson (USA)', balance: 15200.50 },
+  { id: 'CUST-008', label: 'Maria Santos (BRA)', balance: 5890.25 },
+  { id: 'CUST-011', label: 'Victor Petrov (RUS)', balance: 3200.00 },
+  { id: 'CUST-007', label: 'David Park (KOR)', balance: 1850.00 },
+  { id: 'CUST-004', label: 'Kenji Sato (JPN)', balance: 8700.00 },
 ]
 
 const selectedMethod = ref<WithdrawalMethod | null>(null)
-const selectedAccount = ref('MT5-001')
+const selectedAccount = ref('CUST-001')
 const amount = ref('')
 const recipientName = ref('')
 const recipientAccount = ref('')
 const isSubmitting = ref(false)
 const showSuccess = ref(false)
 const showFraudNotice = ref(false)
+
+interface EvalResult {
+  evaluation_id: string
+  decision: 'approved' | 'escalated' | 'blocked'
+  risk_score: number
+  risk_percent: number
+  risk_level: 'low' | 'medium' | 'high'
+  summary: string
+  indicators: { name: string; display_name: string; score: number; reasoning: string; status: string }[]
+  elapsed_s: number
+}
+const evalResult = ref<EvalResult | null>(null)
 
 const currentAccount = computed(() => accounts.find(a => a.id === selectedAccount.value))
 
@@ -84,22 +99,56 @@ async function handleSubmit() {
   if (!canSubmit.value) return
   isSubmitting.value = true
   showFraudNotice.value = true
+  evalResult.value = null
 
-  // Simulate fraud evaluation delay
-  await new Promise(resolve => setTimeout(resolve, 2500))
+  try {
+    const result = await $fetch<EvalResult>('/api/payout/evaluate', {
+      method: 'POST',
+      body: {
+        withdrawal_id: crypto.randomUUID(),
+        customer_id: selectedAccount.value,
+        amount: parsedAmount.value,
+        recipient_name: recipientName.value,
+        recipient_account: recipientAccount.value,
+        ip_address: '203.0.113.42',
+        device_fingerprint: 'demo-device-001',
+        customer_country: 'MYS',
+      },
+    })
 
-  isSubmitting.value = false
-  showFraudNotice.value = false
-  showSuccess.value = true
-
-  setTimeout(() => {
-    showSuccess.value = false
-    amount.value = ''
-    recipientName.value = ''
-    recipientAccount.value = ''
-    selectedMethod.value = null
-  }, 3000)
+    isSubmitting.value = false
+    showFraudNotice.value = false
+    evalResult.value = result
+  } catch {
+    // Fallback: simulate if BE is unreachable
+    await new Promise(resolve => setTimeout(resolve, 2500))
+    isSubmitting.value = false
+    showFraudNotice.value = false
+    showSuccess.value = true
+    setTimeout(() => {
+      showSuccess.value = false
+      amount.value = ''
+      recipientName.value = ''
+      recipientAccount.value = ''
+      selectedMethod.value = null
+    }, 3000)
+  }
 }
+
+function dismissResult() {
+  evalResult.value = null
+  amount.value = ''
+  recipientName.value = ''
+  recipientAccount.value = ''
+  selectedMethod.value = null
+}
+
+const topIndicators = computed(() => {
+  if (!evalResult.value) return []
+  return [...evalResult.value.indicators]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+})
 </script>
 
 <template>
@@ -128,7 +177,7 @@ async function handleSubmit() {
       </div>
     </Transition>
 
-    <!-- Success Message -->
+    <!-- Success Message (fallback) -->
     <Transition
       enter-active-class="transition ease-out duration-200"
       enter-from-class="opacity-0 -translate-y-2"
@@ -142,6 +191,95 @@ async function handleSubmit() {
         <div>
           <p class="text-sm font-medium text-green-800">Withdrawal request submitted!</p>
           <p class="text-xs text-green-600 mt-0.5">Your request has been approved and is being processed. Track it on the Transactions page.</p>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- AI Evaluation Result -->
+    <Transition
+      enter-active-class="transition ease-out duration-300"
+      enter-from-class="opacity-0 -translate-y-2"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition ease-in duration-150"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div v-if="evalResult" class="rounded-xl border overflow-hidden" :class="{
+        'border-green-200 bg-green-50/50': evalResult.decision === 'approved',
+        'border-yellow-200 bg-yellow-50/50': evalResult.decision === 'escalated',
+        'border-red-200 bg-red-50/50': evalResult.decision === 'blocked',
+      }">
+        <div class="p-5 space-y-4">
+          <!-- Header row: Decision badge + Risk score -->
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <Icon
+                :icon="evalResult.decision === 'approved' ? 'lucide:check-circle' : evalResult.decision === 'escalated' ? 'lucide:alert-triangle' : 'lucide:shield-x'"
+                class="w-6 h-6"
+                :class="{
+                  'text-green-600': evalResult.decision === 'approved',
+                  'text-yellow-600': evalResult.decision === 'escalated',
+                  'text-red-600': evalResult.decision === 'blocked',
+                }"
+              />
+              <div>
+                <span class="inline-flex px-2.5 py-1 text-xs font-bold rounded-full uppercase tracking-wide" :class="{
+                  'bg-green-100 text-green-700': evalResult.decision === 'approved',
+                  'bg-yellow-100 text-yellow-700': evalResult.decision === 'escalated',
+                  'bg-red-100 text-red-700': evalResult.decision === 'blocked',
+                }">
+                  {{ evalResult.decision }}
+                </span>
+                <p class="text-xs text-gray-500 mt-1">Processed in {{ evalResult.elapsed_s.toFixed(2) }}s</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-2xl font-bold tabular-nums" :class="{
+                'text-green-600': evalResult.risk_score < 0.3,
+                'text-yellow-600': evalResult.risk_score >= 0.3 && evalResult.risk_score < 0.7,
+                'text-red-600': evalResult.risk_score >= 0.7,
+              }">
+                {{ evalResult.risk_percent }}%
+              </p>
+              <p class="text-xs text-gray-500">Risk Score</p>
+            </div>
+          </div>
+
+          <!-- Top 3 Indicators -->
+          <div>
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Top Risk Indicators</p>
+            <div class="space-y-2">
+              <div v-for="ind in topIndicators" :key="ind.name" class="flex items-center gap-3 bg-white/60 rounded-lg p-2.5">
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-800">{{ ind.display_name }}</p>
+                  <p class="text-xs text-gray-500 truncate">{{ ind.reasoning }}</p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <div class="w-16 bg-gray-200 rounded-full h-1.5">
+                    <div
+                      class="h-1.5 rounded-full"
+                      :class="ind.score >= 0.6 ? 'bg-red-500' : ind.score >= 0.3 ? 'bg-yellow-500' : 'bg-green-500'"
+                      :style="{ width: `${ind.score * 100}%` }"
+                    />
+                  </div>
+                  <span class="text-xs font-bold tabular-nums w-8 text-right" :class="ind.score >= 0.6 ? 'text-red-600' : ind.score >= 0.3 ? 'text-yellow-600' : 'text-green-600'">
+                    {{ (ind.score * 100).toFixed(0) }}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Summary + dismiss -->
+          <div class="flex items-center justify-between pt-2 border-t border-gray-200/60">
+            <p class="text-xs text-gray-600">{{ evalResult.summary }}</p>
+            <button
+              class="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              @click="dismissResult"
+            >
+              New Withdrawal
+            </button>
+          </div>
         </div>
       </div>
     </Transition>

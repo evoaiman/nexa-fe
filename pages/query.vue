@@ -73,7 +73,7 @@ async function sendQuery(queryText?: string) {
       }
     }>('/api/query', {
       method: 'POST',
-      body: { query: q },
+      body: { question: q },
     })
 
     const assistantMsg: QueryMessage = {

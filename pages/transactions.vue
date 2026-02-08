@@ -73,19 +73,41 @@ function openCustomerSummary(tx: Transaction) {
   showCustomerSummary.value = true
 }
 
-function handleApprove(data: { id: string; justification: string }) {
+async function submitDecisionToBE(tx: Transaction, action: 'approved' | 'blocked', reason: string) {
+  try {
+    await $fetch('/api/payout/decision', {
+      method: 'POST',
+      body: {
+        withdrawal_id: tx.withdrawal_id || crypto.randomUUID(),
+        evaluation_id: crypto.randomUUID(),
+        officer_id: 'officer-demo-001',
+        action,
+        reason,
+      },
+    })
+  } catch {
+    // BE call failed — local state update still proceeds
+  }
+}
+
+async function handleApprove(data: { id: string; justification: string }) {
+  const tx = filteredTransactions.value.find(t => t.id === data.id)
+  if (tx) await submitDecisionToBE(tx, 'approved', data.justification)
   updateTransactionStatus(data.id, 'approved')
   showPayoutReview.value = false
   selectedTransaction.value = null
 }
 
-function handleBlock(data: { id: string; justification: string }) {
+async function handleBlock(data: { id: string; justification: string }) {
+  const tx = filteredTransactions.value.find(t => t.id === data.id)
+  if (tx) await submitDecisionToBE(tx, 'blocked', data.justification)
   updateTransactionStatus(data.id, 'blocked')
   showPayoutReview.value = false
   selectedTransaction.value = null
 }
 
-function handleQuickApprove(tx: Transaction) {
+async function handleQuickApprove(tx: Transaction) {
+  await submitDecisionToBE(tx, 'approved', 'Quick approval by officer')
   updateTransactionStatus(tx.id, 'approved')
 }
 
@@ -97,7 +119,8 @@ function handleFlag(data: { reason: string; notes: string }) {
   selectedTransaction.value = null
 }
 
-function handleQuickBlock(tx: Transaction) {
+async function handleQuickBlock(tx: Transaction) {
+  await submitDecisionToBE(tx, 'blocked', 'Quick block by officer')
   updateTransactionStatus(tx.id, 'blocked')
 }
 

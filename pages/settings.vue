@@ -47,11 +47,50 @@ function weightColor(weight: number) {
 
 async function saveSettings() {
   isSaving.value = true
-  await new Promise(resolve => setTimeout(resolve, 1000))
+  try {
+    const weights: Record<string, number> = {}
+    indicators.value.forEach((i) => { weights[i.key] = i.weight })
+    await $fetch('/api/settings', {
+      method: 'POST',
+      body: {
+        approve_below: thresholds.value.approve * 100,
+        escalate_below: thresholds.value.block * 100,
+        indicator_weights: weights,
+        updated_by: 'officer-demo-001',
+        reason: 'Updated via settings page',
+      },
+    })
+  }
+  catch {
+    // Fallback — still show saved for demo
+  }
   isSaving.value = false
   showSaved.value = true
   setTimeout(() => { showSaved.value = false }, 2000)
 }
+
+// Load settings from BE on mount
+onMounted(async () => {
+  try {
+    const data = await $fetch<{ approve_below: number, escalate_below: number, indicator_weights: Record<string, number> }>('/api/settings')
+    if (data) {
+      thresholds.value.approve = data.approve_below / 100
+      thresholds.value.escalate_min = data.approve_below / 100
+      thresholds.value.escalate_max = data.escalate_below / 100
+      thresholds.value.block = data.escalate_below / 100
+      if (data.indicator_weights) {
+        indicators.value.forEach((i) => {
+          if (data.indicator_weights[i.key] !== undefined) {
+            i.weight = data.indicator_weights[i.key]
+          }
+        })
+      }
+    }
+  }
+  catch {
+    // Use defaults
+  }
+})
 
 function resetDefaults() {
   thresholds.value = { approve: 0.30, escalate_min: 0.30, escalate_max: 0.70, block: 0.70 }
