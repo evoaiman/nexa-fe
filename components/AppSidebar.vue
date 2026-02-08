@@ -6,8 +6,7 @@ const isOpen = ref(false)
 
 const navItems = [
   { label: 'Dashboard', to: '/', icon: 'lucide:layout-grid' },
-  { label: 'Deposit', to: '/deposit', icon: 'lucide:arrow-down-circle' },
-  { label: 'Withdrawal', to: '/withdrawal', icon: 'lucide:arrow-up-circle' },
+{ label: 'Withdrawal', to: '/withdrawal', icon: 'lucide:arrow-up-circle' },
   { label: 'Transactions', to: '/transactions', icon: 'lucide:list' },
   { label: 'Alerts', to: '/alerts', icon: 'lucide:bell' },
   { label: 'NL Query', to: '/query', icon: 'lucide:message-square' },
