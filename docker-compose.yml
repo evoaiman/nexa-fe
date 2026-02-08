@@ -1,12 +1,12 @@
 services:
-  fe:
+  nexa-fe:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: nexa_fe
     environment:
-      API_BASE: http://host.docker.internal:8081
-      NUXT_API_BASE: http://host.docker.internal:8081
+      API_BASE: ${API_BASE:-http://host.docker.internal:8081}
+      NUXT_API_BASE: ${NUXT_API_BASE:-http://host.docker.internal:8081}
     ports:
       - "3333:3000"
     extra_hosts:
