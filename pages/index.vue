@@ -129,67 +129,39 @@ function indicatorMaxCount() {
       <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <!-- Total Payouts Today -->
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div class="flex items-center gap-3">
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
-              <Icon icon="lucide:banknote" class="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <p class="text-sm font-medium text-gray-500">Total Payouts Today</p>
-              <p class="text-2xl font-bold text-gray-900">{{ stats.total_payouts_today }}</p>
-              <p class="text-xs text-gray-400">{{ formatCurrency(stats.total_payout_amount) }}</p>
-            </div>
-          </div>
+          <p class="text-sm font-medium text-gray-500">Total Payouts Today</p>
+          <p class="text-2xl font-bold text-gray-900">{{ stats.total_payouts_today }}</p>
+          <p class="text-xs text-gray-400">{{ formatCurrency(stats.total_payout_amount) }}</p>
         </div>
 
         <!-- Auto-Approved Rate -->
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div class="flex items-center gap-3">
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50">
-              <Icon icon="lucide:zap" class="h-5 w-5 text-green-600" />
-            </div>
-            <div>
-              <p class="text-sm font-medium text-gray-500">Auto-Approved Rate</p>
-              <p class="text-2xl font-bold text-gray-900">{{ stats.auto_approved_rate }}%</p>
-              <p class="flex items-center gap-1 text-xs" :class="stats.auto_approved_trend >= 0 ? 'text-green-600' : 'text-red-600'">
-                <Icon :icon="stats.auto_approved_trend >= 0 ? 'lucide:trending-up' : 'lucide:trending-down'" class="h-3 w-3" />
-                {{ Math.abs(stats.auto_approved_trend) }}% vs yesterday
-              </p>
-            </div>
-          </div>
+          <p class="text-sm font-medium text-gray-500">Auto-Approved Rate</p>
+          <p class="text-2xl font-bold text-gray-900">{{ stats.auto_approved_rate }}%</p>
+          <p class="flex items-center gap-1 text-xs" :class="stats.auto_approved_trend >= 0 ? 'text-green-600' : 'text-red-600'">
+            <Icon :icon="stats.auto_approved_trend >= 0 ? 'lucide:trending-up' : 'lucide:trending-down'" class="h-3 w-3" />
+            {{ Math.abs(stats.auto_approved_trend) }}% vs yesterday
+          </p>
         </div>
 
         <!-- Pending Review -->
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div class="flex items-center gap-3">
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50">
-              <Icon icon="lucide:clock" class="h-5 w-5 text-amber-600" />
-            </div>
-            <div>
-              <p class="text-sm font-medium text-gray-500">Pending Review</p>
-              <p class="text-2xl font-bold text-gray-900">{{ stats.pending_review_count }}</p>
-              <p v-if="stats.pending_review_count > 10" class="text-xs font-medium text-amber-600">
-                Needs attention
-              </p>
-              <p v-else class="text-xs text-gray-400">In queue</p>
-            </div>
-          </div>
+          <p class="text-sm font-medium text-gray-500">Pending Review</p>
+          <p class="text-2xl font-bold text-gray-900">{{ stats.pending_review_count }}</p>
+          <p v-if="stats.pending_review_count > 10" class="text-xs font-medium text-amber-600">
+            Needs attention
+          </p>
+          <p v-else class="text-xs text-gray-400">In queue</p>
         </div>
 
         <!-- Active Alerts -->
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div class="flex items-center gap-3">
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50">
-              <Icon icon="lucide:bell-ring" class="h-5 w-5 text-red-600" />
-            </div>
-            <div>
-              <p class="text-sm font-medium text-gray-500">Active Alerts</p>
-              <p class="text-2xl font-bold text-gray-900">{{ stats.active_alerts }}</p>
-              <div class="flex items-center gap-2 text-xs">
-                <span class="text-red-600">{{ stats.alert_severity.high }}H</span>
-                <span class="text-amber-600">{{ stats.alert_severity.medium }}M</span>
-                <span class="text-gray-400">{{ stats.alert_severity.low }}L</span>
-              </div>
-            </div>
+          <p class="text-sm font-medium text-gray-500">Active Alerts</p>
+          <p class="text-2xl font-bold text-gray-900">{{ stats.active_alerts }}</p>
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-red-600">{{ stats.alert_severity.high }}H</span>
+            <span class="text-amber-600">{{ stats.alert_severity.medium }}M</span>
+            <span class="text-gray-400">{{ stats.alert_severity.low }}L</span>
           </div>
         </div>
       </div>

@@ -124,13 +124,18 @@ async function handleQuickBlock(tx: Transaction) {
 }
 
 function getRowActions(tx: Transaction) {
-  return [
+  const actions = [
     { label: 'View Details', icon: 'lucide:eye', handler: () => openPayoutReview(tx) },
     { label: 'Customer Profile', icon: 'lucide:user', handler: () => openCustomerSummary(tx) },
-    { label: 'Approve', icon: 'lucide:check-circle', color: 'green', handler: () => handleQuickApprove(tx) },
-    { label: 'Flag Account', icon: 'lucide:flag', color: 'orange', handler: () => openFlagModal(tx) },
-    { label: 'Block Account', icon: 'lucide:ban', color: 'red', handler: () => handleQuickBlock(tx) },
   ]
+  if (tx.status !== 'approved') {
+    actions.push(
+      { label: 'Approve', icon: 'lucide:check-circle', color: 'green', handler: () => handleQuickApprove(tx) },
+      { label: 'Flag Account', icon: 'lucide:flag', color: 'orange', handler: () => openFlagModal(tx) },
+      { label: 'Block Account', icon: 'lucide:ban', color: 'red', handler: () => handleQuickBlock(tx) },
+    )
+  }
+  return actions
 }
 </script>
 

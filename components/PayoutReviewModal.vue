@@ -346,8 +346,8 @@ const paymentMethodIcon = computed(() => {
               </div>
             </div>
 
-            <!-- Justification + Actions -->
-            <div class="bg-gray-50 rounded-lg p-4">
+            <!-- Justification + Actions (only for non-approved transactions) -->
+            <div v-if="transaction.status !== 'approved'" class="bg-gray-50 rounded-lg p-4">
               <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                 <Icon icon="lucide:message-square" class="w-4 h-4" />
                 Decision Justification
@@ -360,6 +360,14 @@ const paymentMethodIcon = computed(() => {
                 placeholder="Provide your reasoning for the decision (required)..."
               />
             </div>
+
+            <!-- Auto-approved badge -->
+            <div v-else class="bg-green-50 rounded-lg p-4 border border-green-200">
+              <div class="flex items-center gap-2 text-green-700">
+                <Icon icon="lucide:check-circle" class="w-5 h-5" />
+                <span class="text-sm font-medium">Auto-approved — no human action required</span>
+              </div>
+            </div>
           </div>
 
           <!-- Footer Actions -->
@@ -368,9 +376,9 @@ const paymentMethodIcon = computed(() => {
               class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               @click="handleClose"
             >
-              Cancel
+              {{ transaction.status === 'approved' ? 'Close' : 'Cancel' }}
             </button>
-            <div class="flex items-center gap-3">
+            <div v-if="transaction.status !== 'approved'" class="flex items-center gap-3">
               <button
                 class="px-5 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 :disabled="!justification.trim()"

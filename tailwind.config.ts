@@ -12,13 +12,13 @@ export default {
   theme: {
     extend: {
       borderRadius: {
-        sm: '0.125rem',
-        DEFAULT: '0.125rem',
-        md: '0.125rem',
-        lg: '0.125rem',
-        xl: '0.125rem',
-        '2xl': '0.125rem',
-        '3xl': '0.125rem',
+        sm: '0.375rem',
+        DEFAULT: '0.375rem',
+        md: '0.375rem',
+        lg: '0.375rem',
+        xl: '0.375rem',
+        '2xl': '0.375rem',
+        '3xl': '0.375rem',
       },
       colors: {
         primary: {
