@@ -105,6 +105,8 @@ export function useTransactions() {
       result = result.filter(t => t.created_at <= dateTo.value)
     }
 
+    result = [...result].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
     return result
   })
 
