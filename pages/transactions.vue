@@ -128,7 +128,11 @@ function getRowActions(tx: Transaction) {
     { label: 'View Details', icon: 'lucide:eye', handler: () => openPayoutReview(tx) },
     { label: 'Customer Profile', icon: 'lucide:user', handler: () => openCustomerSummary(tx) },
   ]
-  if (tx.status !== 'approved') {
+  if (tx.status === 'approved') {
+    actions.push(
+      { label: 'Revoke Approval', icon: 'lucide:shield-off', color: 'red', handler: () => openPayoutReview(tx) },
+    )
+  } else {
     actions.push(
       { label: 'Approve', icon: 'lucide:check-circle', color: 'green', handler: () => handleQuickApprove(tx) },
       { label: 'Flag Account', icon: 'lucide:flag', color: 'orange', handler: () => openFlagModal(tx) },

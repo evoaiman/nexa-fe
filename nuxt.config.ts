@@ -4,7 +4,7 @@ export default defineNuxtConfig({
   modules: ['@nuxtjs/tailwindcss'],
 
   runtimeConfig: {
-    apiBase: process.env.API_BASE || 'http://localhost:8081',
+    apiBase: process.env.API_BASE || 'http://localhost:8080',
   },
 
   devtools: { enabled: true },

@@ -33,6 +33,7 @@ const inputEl = ref<HTMLInputElement>()
 const messages = ref<QueryMessage[]>([])
 const queryHistory = ref<string[]>([])
 const showHistory = ref(false)
+const sessionId = ref(generateId())
 
 const exampleQueries = [
   'Show me accounts that deposited but traded minimally',
@@ -51,17 +52,6 @@ function scrollToBottom() {
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
     }
   })
-}
-
-function buildHistory(): { role: string; content: string }[] {
-  // Only include completed messages (skip the empty placeholder), strip tool noise
-  return messages.value
-    .filter(m => m.content && !m.content.startsWith('Error:'))
-    .map(m => ({
-      role: m.role,
-      content: m.content.replace(/\n\n> Running SQL query\.\.\.\n/g, '').trim(),
-    }))
-    .filter(m => m.content)
 }
 
 async function sendQuery(queryText?: string) {
@@ -104,7 +94,7 @@ async function sendQuery(queryText?: string) {
     const response = await fetch('/api/query/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: q, history: buildHistory().slice(0, -2) }),
+      body: JSON.stringify({ question: q, session_id: sessionId.value }),
     })
 
     if (!response.ok || !response.body) throw new Error('Stream failed')
@@ -195,6 +185,7 @@ function exportResults() {
 
 function clearChat() {
   messages.value = []
+  sessionId.value = generateId()
 }
 
 function formatTime(date: Date) {

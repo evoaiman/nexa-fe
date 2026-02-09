@@ -77,10 +77,8 @@ export function useTransactions() {
     }
   }
 
-  // Fetch on init (client-side only)
-  if (import.meta.client) {
-    fetchTransactions()
-  }
+  // Poll every 10s (handles initial fetch + auto-refresh)
+  usePolling(fetchTransactions, 10000)
 
   const filteredTransactions = computed(() => {
     let result = transactions.value

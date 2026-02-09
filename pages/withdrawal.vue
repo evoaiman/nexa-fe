@@ -23,17 +23,39 @@ const withdrawalMethods: WithdrawalMethod[] = [
   { id: 'crypto', name: 'Crypto (BTC/ETH)', icon: 'lucide:bitcoin', processingTime: '10-60 minutes', fee: 'Network fee', feeAmount: 0, minAmount: 50, maxAmount: 200000 },
 ]
 
-const accounts = [
-  { id: 'CUST-001', label: 'Sarah Chen (GBR)', balance: 12450.00 },
-  { id: 'CUST-002', label: 'James Wilson (USA)', balance: 15200.50 },
-  { id: 'CUST-008', label: 'Maria Santos (BRA)', balance: 5890.25 },
-  { id: 'CUST-011', label: 'Victor Petrov (RUS)', balance: 3200.00 },
-  { id: 'CUST-007', label: 'David Park (KOR)', balance: 1850.00 },
-  { id: 'CUST-004', label: 'Kenji Sato (JPN)', balance: 8700.00 },
-]
+interface CustomerAccount {
+  id: string
+  name: string
+  country: string
+  label: string
+}
+
+const accounts = ref<CustomerAccount[]>([])
+const loadingAccounts = ref(true)
+
+async function fetchCustomers(): Promise<void> {
+  try {
+    const data = await $fetch<{ id: string; name: string; country: string }[]>('/api/customers')
+    accounts.value = data.map(c => ({
+      id: c.id,
+      name: c.name,
+      country: c.country,
+      label: `${c.name} (${c.country})`,
+    }))
+    if (accounts.value.length > 0) {
+      selectedAccount.value = accounts.value[0].id
+    }
+  } catch {
+    accounts.value = []
+  } finally {
+    loadingAccounts.value = false
+  }
+}
+
+onMounted(fetchCustomers)
 
 const selectedMethod = ref<WithdrawalMethod | null>(null)
-const selectedAccount = ref('CUST-001')
+const selectedAccount = ref('')
 const amount = ref('')
 const recipientName = ref('')
 const recipientAccount = ref('')
@@ -50,10 +72,13 @@ interface EvalResult {
   summary: string
   indicators: { name: string; display_name: string; score: number; reasoning: string; status: string }[]
   elapsed_s: number
+  triage?: { constellation_analysis: string; assignments: { investigator: string; priority: string }[]; elapsed_s: number }
+  investigators?: { investigator_name: string; display_name: string; score: number; confidence: number; reasoning: string; elapsed_s: number }[]
+  total_elapsed_s?: number
 }
 const evalResult = ref<EvalResult | null>(null)
 
-const currentAccount = computed(() => accounts.find(a => a.id === selectedAccount.value))
+const currentAccount = computed(() => accounts.value.find(a => a.id === selectedAccount.value))
 
 const parsedAmount = computed(() => {
   const val = parseFloat(amount.value)
@@ -80,8 +105,6 @@ const amountError = computed(() => {
     return `Minimum withdrawal is ${formatCurrency(selectedMethod.value.minAmount)}`
   if (parsedAmount.value > selectedMethod.value.maxAmount)
     return `Maximum withdrawal is ${formatCurrency(selectedMethod.value.maxAmount)}`
-  if (currentAccount.value && parsedAmount.value > currentAccount.value.balance)
-    return 'Insufficient balance'
   return ''
 })
 
@@ -102,7 +125,7 @@ async function handleSubmit() {
   evalResult.value = null
 
   try {
-    const result = await $fetch<EvalResult>('/api/payout/evaluate', {
+    const result = await $fetch<EvalResult>('/api/withdrawals/investigate', {
       method: 'POST',
       body: {
         withdrawal_id: crypto.randomUUID(),
@@ -112,7 +135,7 @@ async function handleSubmit() {
         recipient_account: recipientAccount.value,
         ip_address: '203.0.113.42',
         device_fingerprint: 'demo-device-001',
-        customer_country: 'MYS',
+        customer_country: currentAccount.value?.country || 'MYS',
       },
     })
 
@@ -350,14 +373,16 @@ const topIndicators = computed(() => {
             <label class="block text-sm font-medium text-gray-700 mb-1.5">From Account</label>
             <select
               v-model="selectedAccount"
-              class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              :disabled="loadingAccounts"
+              class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50"
             >
+              <option v-if="loadingAccounts" value="" disabled>Loading accounts...</option>
               <option v-for="account in accounts" :key="account.id" :value="account.id">
                 {{ account.label }}
               </option>
             </select>
             <p v-if="currentAccount" class="mt-1 text-xs text-gray-500">
-              Available: <span class="font-medium text-gray-700">{{ formatCurrency(currentAccount.balance) }}</span>
+              Customer ID: <span class="font-medium text-gray-700">{{ currentAccount.id }}</span>
             </p>
           </div>
 

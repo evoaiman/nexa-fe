@@ -346,27 +346,27 @@ const paymentMethodIcon = computed(() => {
               </div>
             </div>
 
-            <!-- Justification + Actions (only for non-approved transactions) -->
-            <div v-if="transaction.status !== 'approved'" class="bg-gray-50 rounded-lg p-4">
+            <!-- Officer Override Info (for auto-approved) -->
+            <div v-if="transaction.status === 'approved'" class="bg-blue-50 rounded-lg p-3 border border-blue-200">
+              <div class="flex items-center gap-2 text-blue-700">
+                <Icon icon="lucide:info" class="w-4 h-4 shrink-0" />
+                <span class="text-sm">Auto-approved by AI system. You can override this decision if needed.</span>
+              </div>
+            </div>
+
+            <!-- Justification (always shown) -->
+            <div class="bg-gray-50 rounded-lg p-4">
               <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                 <Icon icon="lucide:message-square" class="w-4 h-4" />
-                Decision Justification
+                {{ transaction.status === 'approved' ? 'Override Justification' : 'Decision Justification' }}
                 <span class="text-red-500">*</span>
               </h4>
               <textarea
                 v-model="justification"
                 rows="3"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                placeholder="Provide your reasoning for the decision (required)..."
+                :placeholder="transaction.status === 'approved' ? 'Provide reason for revoking approval (required)...' : 'Provide your reasoning for the decision (required)...'"
               />
-            </div>
-
-            <!-- Auto-approved badge -->
-            <div v-else class="bg-green-50 rounded-lg p-4 border border-green-200">
-              <div class="flex items-center gap-2 text-green-700">
-                <Icon icon="lucide:check-circle" class="w-5 h-5" />
-                <span class="text-sm font-medium">Auto-approved — no human action required</span>
-              </div>
             </div>
           </div>
 
@@ -376,18 +376,19 @@ const paymentMethodIcon = computed(() => {
               class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               @click="handleClose"
             >
-              {{ transaction.status === 'approved' ? 'Close' : 'Cancel' }}
+              Cancel
             </button>
-            <div v-if="transaction.status !== 'approved'" class="flex items-center gap-3">
+            <div class="flex items-center gap-3">
               <button
                 class="px-5 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 :disabled="!justification.trim()"
                 @click="handleBlock"
               >
                 <Icon icon="lucide:ban" class="w-4 h-4" />
-                Block
+                {{ transaction.status === 'approved' ? 'Revoke & Block' : 'Block' }}
               </button>
               <button
+                v-if="transaction.status !== 'approved'"
                 class="px-5 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 :disabled="!justification.trim()"
                 @click="handleApprove"
