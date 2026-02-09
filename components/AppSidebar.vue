@@ -7,7 +7,7 @@ const isOpen = ref(false)
 const navItems = [
   { label: 'Dashboard', to: '/', icon: 'lucide:layout-grid' },
 { label: 'Withdrawal', to: '/withdrawal', icon: 'lucide:arrow-up-circle' },
-  { label: 'Transactions', to: '/transactions', icon: 'lucide:list' },
+  { label: 'Withdrawals', to: '/withdrawals', icon: 'lucide:list' },
   { label: 'Alerts', to: '/alerts', icon: 'lucide:bell' },
   { label: 'NL Query', to: '/query', icon: 'lucide:message-square' },
   { label: 'Settings', to: '/settings', icon: 'lucide:settings' },
@@ -15,7 +15,7 @@ const navItems = [
 
 function isActive(to: string) {
   if (to === '/') return route.path === '/'
-  return route.path.startsWith(to)
+  return route.path === to || route.path.startsWith(to + '/')
 }
 
 function closeMobile() {

@@ -3,7 +3,7 @@ import { Icon } from '@iconify/vue'
 import type { Transaction, TransactionStatus } from '~/composables/useTransactions'
 import { formatCurrency, formatDate } from '~/utils/formatters'
 
-useHead({ title: 'Transactions - Nexa' })
+useHead({ title: 'Withdrawals - Nexa' })
 
 const {
   selectedStatus,
@@ -148,7 +148,7 @@ function getRowActions(tx: Transaction) {
     <!-- Page Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">Payout Review Queue</h1>
+        <h1 class="text-2xl font-bold text-gray-900">Withdrawal Review Queue</h1>
         <p class="text-sm text-gray-500 mt-1">Review and approve withdrawal requests with AI-powered risk analysis</p>
       </div>
     </div>
@@ -295,7 +295,7 @@ function getRowActions(tx: Transaction) {
             <tr v-if="paginatedTransactions.length === 0">
               <td colspan="7" class="px-4 py-12 text-center">
                 <Icon icon="lucide:inbox" class="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p class="text-gray-500 text-sm">No transactions found matching your filters</p>
+                <p class="text-gray-500 text-sm">No withdrawals found matching your filters</p>
               </td>
             </tr>
           </tbody>
@@ -305,7 +305,7 @@ function getRowActions(tx: Transaction) {
       <!-- Pagination -->
       <div class="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
         <p class="text-sm text-gray-600">
-          Showing {{ paginatedTransactions.length }} of {{ filteredTransactions.length }} transactions
+          Showing {{ paginatedTransactions.length }} of {{ filteredTransactions.length }} withdrawals
         </p>
         <div class="flex items-center gap-2">
           <button
