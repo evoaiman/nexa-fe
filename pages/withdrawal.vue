@@ -64,17 +64,7 @@ const showSuccess = ref(false)
 const showFraudNotice = ref(false)
 
 interface EvalResult {
-  evaluation_id: string
   decision: 'approved' | 'escalated' | 'blocked'
-  risk_score: number
-  risk_percent: number
-  risk_level: 'low' | 'medium' | 'high'
-  summary: string
-  indicators: { name: string; display_name: string; score: number; reasoning: string; status: string }[]
-  elapsed_s: number
-  triage?: { constellation_analysis: string; assignments: { investigator: string; priority: string }[]; elapsed_s: number }
-  investigators?: { investigator_name: string; display_name: string; score: number; confidence: number; reasoning: string; elapsed_s: number }[]
-  total_elapsed_s?: number
 }
 const evalResult = ref<EvalResult | null>(null)
 
@@ -166,12 +156,6 @@ function dismissResult() {
   selectedMethod.value = null
 }
 
-const topIndicators = computed(() => {
-  if (!evalResult.value) return []
-  return [...evalResult.value.indicators]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
-})
 </script>
 
 <template>
@@ -218,7 +202,7 @@ const topIndicators = computed(() => {
       </div>
     </Transition>
 
-    <!-- AI Evaluation Result -->
+    <!-- Withdrawal Result (Customer-Facing: simple approved / under review) -->
     <Transition
       enter-active-class="transition ease-out duration-300"
       enter-from-class="opacity-0 -translate-y-2"
@@ -227,82 +211,37 @@ const topIndicators = computed(() => {
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="evalResult" class="rounded-xl border overflow-hidden" :class="{
-        'border-green-200 bg-green-50/50': evalResult.decision === 'approved',
-        'border-yellow-200 bg-yellow-50/50': evalResult.decision === 'escalated',
-        'border-red-200 bg-red-50/50': evalResult.decision === 'blocked',
-      }">
-        <div class="p-5 space-y-4">
-          <!-- Header row: Decision badge + Risk score -->
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <Icon
-                :icon="evalResult.decision === 'approved' ? 'lucide:check-circle' : evalResult.decision === 'escalated' ? 'lucide:alert-triangle' : 'lucide:shield-x'"
-                class="w-6 h-6"
-                :class="{
-                  'text-green-600': evalResult.decision === 'approved',
-                  'text-yellow-600': evalResult.decision === 'escalated',
-                  'text-red-600': evalResult.decision === 'blocked',
-                }"
-              />
-              <div>
-                <span class="inline-flex px-2.5 py-1 text-xs font-bold rounded-full uppercase tracking-wide" :class="{
-                  'bg-green-100 text-green-700': evalResult.decision === 'approved',
-                  'bg-yellow-100 text-yellow-700': evalResult.decision === 'escalated',
-                  'bg-red-100 text-red-700': evalResult.decision === 'blocked',
-                }">
-                  {{ evalResult.decision }}
-                </span>
-                <p class="text-xs text-gray-500 mt-1">Processed in {{ evalResult.elapsed_s.toFixed(2) }}s</p>
-              </div>
-            </div>
-            <div class="text-right">
-              <p class="text-2xl font-bold tabular-nums" :class="{
-                'text-green-600': evalResult.risk_score < 0.3,
-                'text-yellow-600': evalResult.risk_score >= 0.3 && evalResult.risk_score < 0.7,
-                'text-red-600': evalResult.risk_score >= 0.7,
-              }">
-                {{ evalResult.risk_percent }}%
-              </p>
-              <p class="text-xs text-gray-500">Risk Score</p>
-            </div>
-          </div>
+      <!-- Approved -->
+      <div v-if="evalResult && evalResult.decision === 'approved'" class="rounded-xl border border-green-200 bg-green-50/50 p-5">
+        <div class="flex items-center gap-3 mb-3">
+          <Icon icon="lucide:check-circle" class="w-6 h-6 text-green-600" />
+          <span class="text-lg font-semibold text-green-800">Withdrawal Approved</span>
+        </div>
+        <p class="text-sm text-green-700 leading-relaxed">Your withdrawal has been approved and is being processed. You can track its status on the Transactions page.</p>
+        <div class="mt-4 flex justify-end">
+          <button
+            class="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            @click="dismissResult"
+          >
+            New Withdrawal
+          </button>
+        </div>
+      </div>
 
-          <!-- Top 3 Indicators -->
-          <div>
-            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Top Risk Indicators</p>
-            <div class="space-y-2">
-              <div v-for="ind in topIndicators" :key="ind.name" class="flex items-center gap-3 bg-white/60 rounded-lg p-2.5">
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-gray-800">{{ ind.display_name }}</p>
-                  <p class="text-xs text-gray-500 truncate">{{ ind.reasoning }}</p>
-                </div>
-                <div class="flex items-center gap-2 shrink-0">
-                  <div class="w-16 bg-gray-200 rounded-full h-1.5">
-                    <div
-                      class="h-1.5 rounded-full"
-                      :class="ind.score >= 0.6 ? 'bg-red-500' : ind.score >= 0.3 ? 'bg-yellow-500' : 'bg-green-500'"
-                      :style="{ width: `${ind.score * 100}%` }"
-                    />
-                  </div>
-                  <span class="text-xs font-bold tabular-nums w-8 text-right" :class="ind.score >= 0.6 ? 'text-red-600' : ind.score >= 0.3 ? 'text-yellow-600' : 'text-green-600'">
-                    {{ (ind.score * 100).toFixed(0) }}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Summary + dismiss -->
-          <div class="flex items-center justify-between pt-2 border-t border-gray-200/60">
-            <p class="text-xs text-gray-600">{{ evalResult.summary }}</p>
-            <button
-              class="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              @click="dismissResult"
-            >
-              New Withdrawal
-            </button>
-          </div>
+      <!-- Under Review (escalated or blocked) -->
+      <div v-else-if="evalResult" class="rounded-xl border border-yellow-200 bg-yellow-50/50 p-5">
+        <div class="flex items-center gap-3 mb-3">
+          <Icon icon="lucide:clock" class="w-6 h-6 text-yellow-600" />
+          <span class="text-lg font-semibold text-yellow-800">Withdrawal Under Review</span>
+        </div>
+        <p class="text-sm text-yellow-700 leading-relaxed">Your withdrawal is under review. You will be notified once it has been processed. This usually takes 1-2 business days.</p>
+        <div class="mt-4 flex justify-end">
+          <button
+            class="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            @click="dismissResult"
+          >
+            New Withdrawal
+          </button>
         </div>
       </div>
     </Transition>

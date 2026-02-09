@@ -35,11 +35,19 @@ export interface Transaction {
   risk_level: 'low' | 'medium' | 'high' | 'critical'
   status: 'pending' | 'approved' | 'escalated' | 'blocked'
   indicators: RiskIndicator[]
-  llm_decision?: {
-    reasoning: string
-    recommendation: string
-    confidence: number
+  triage?: {
+    constellation_analysis: string
+    assignments: { investigator: string; priority: string }[]
+    elapsed_s: number
   }
+  investigators?: {
+    investigator_name: string
+    display_name: string
+    score: number
+    confidence: number
+    reasoning: string
+    elapsed_s: number
+  }[]
   created_at: string
   updated_at: string
 }

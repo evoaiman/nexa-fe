@@ -319,30 +319,70 @@ const paymentMethodIcon = computed(() => {
               </div>
             </div>
 
-            <!-- Gray-Zone LLM Decision -->
-            <div v-if="transaction.llm_decision" class="bg-purple-50 rounded-lg p-4 border border-purple-200">
-              <h4 class="text-sm font-semibold text-purple-800 mb-3 flex items-center gap-2">
+            <!-- Triage Constellation Analysis -->
+            <div v-if="transaction.triage" class="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
+              <h4 class="text-sm font-semibold text-indigo-800 mb-3 flex items-center gap-2">
                 <Icon icon="lucide:brain" class="w-4 h-4" />
-                Gray-Zone AI Decision
-                <span class="px-2 py-0.5 bg-purple-200 text-purple-700 rounded-full text-xs font-medium">
-                  {{ (transaction.llm_decision.confidence * 100).toFixed(0) }}% confidence
+                Triage Constellation Analysis
+                <span class="px-2 py-0.5 bg-indigo-200 text-indigo-700 rounded-full text-xs font-medium">
+                  {{ transaction.triage.elapsed_s.toFixed(1) }}s
                 </span>
               </h4>
-              <div class="space-y-2">
-                <div class="flex items-center gap-2">
-                  <span class="text-xs font-medium text-purple-600">Recommendation:</span>
-                  <span
-                    class="px-2 py-0.5 text-xs font-bold rounded-full"
-                    :class="
-                      transaction.llm_decision.recommendation === 'APPROVE' ? 'bg-green-100 text-green-700' :
-                      transaction.llm_decision.recommendation === 'BLOCK' ? 'bg-red-100 text-red-700' :
-                      'bg-yellow-100 text-yellow-700'
-                    "
-                  >
-                    {{ transaction.llm_decision.recommendation }}
-                  </span>
+              <p class="text-sm text-indigo-900 leading-relaxed mb-3">{{ transaction.triage.constellation_analysis }}</p>
+              <div v-if="transaction.triage.assignments.length" class="flex flex-wrap gap-2">
+                <span
+                  v-for="a in transaction.triage.assignments"
+                  :key="a.investigator"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                  :class="a.priority === 'high' ? 'bg-red-100 text-red-700' : a.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'"
+                >
+                  <Icon icon="lucide:search" class="w-3 h-3" />
+                  {{ a.investigator.replace('_', ' ') }}
+                  <span class="opacity-70">({{ a.priority }})</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- Investigator Findings -->
+            <div v-if="transaction.investigators?.length">
+              <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <Icon icon="lucide:search" class="w-4 h-4" />
+                Investigator Findings ({{ transaction.investigators.length }})
+              </h4>
+              <div class="grid grid-cols-1 gap-3">
+                <div
+                  v-for="inv in transaction.investigators"
+                  :key="inv.investigator_name"
+                  class="border rounded-lg p-4"
+                  :class="inv.score >= 0.7 ? 'border-red-200 bg-red-50/50' : inv.score >= 0.3 ? 'border-yellow-200 bg-yellow-50/50' : 'border-green-200 bg-green-50/50'"
+                >
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-gray-800">{{ inv.display_name }}</span>
+                    <div class="flex items-center gap-3">
+                      <span class="text-xs text-gray-400">{{ inv.elapsed_s.toFixed(1) }}s</span>
+                      <span
+                        class="text-sm font-bold"
+                        :class="getScoreTextClass(inv.score)"
+                      >
+                        {{ inv.score.toFixed(2) }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+                    <div
+                      class="h-1.5 rounded-full transition-all"
+                      :class="getScoreBarClass(inv.score)"
+                      :style="{ width: `${inv.score * 100}%` }"
+                    />
+                  </div>
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xs text-gray-500">
+                      <Icon icon="lucide:percent" class="w-3 h-3 inline" />
+                      {{ (inv.confidence * 100).toFixed(0) }}% confidence
+                    </span>
+                  </div>
+                  <p class="text-sm text-gray-700 leading-relaxed">{{ inv.reasoning }}</p>
                 </div>
-                <p class="text-sm text-purple-900 leading-relaxed">{{ transaction.llm_decision.reasoning }}</p>
               </div>
             </div>
 
