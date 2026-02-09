@@ -67,15 +67,18 @@ export function useTransactions() {
   async function fetchTransactions() {
     isLoading.value = true
     try {
-      const data = await $fetch<{ items: Transaction[] }>('/api/transactions', {
-        params: {
-          page: 1,
-          page_size: 100,
-        },
-      })
-      if (data?.items?.length) {
-        transactions.value = data.items
-      }
+      const all: Transaction[] = []
+      let page = 1
+      let totalPages = 1
+      do {
+        const data = await $fetch<{ items: Transaction[]; total_pages: number }>('/api/transactions', {
+          params: { page, page_size: 100 },
+        })
+        if (data?.items?.length) all.push(...data.items)
+        totalPages = data?.total_pages ?? 1
+        page++
+      } while (page <= totalPages)
+      transactions.value = all
     }
     catch {
       // BE unavailable
