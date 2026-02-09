@@ -1,13 +1,23 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import { marked } from 'marked'
+
+marked.setOptions({ breaks: true, gfm: true })
 
 useHead({ title: 'NL Query - Nexa' })
+
+interface SqlQuery {
+  sql: string
+  result: string
+}
 
 interface QueryMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
+  sqlQueries: SqlQuery[]
+  showSql: boolean
   data?: {
     summary?: string
     table?: { headers: string[]; rows: string[][] }
@@ -17,7 +27,9 @@ interface QueryMessage {
 
 const input = ref('')
 const isLoading = ref(false)
+const isStreaming = ref(false)
 const messagesContainer = ref<HTMLElement>()
+const inputEl = ref<HTMLInputElement>()
 const messages = ref<QueryMessage[]>([])
 const queryHistory = ref<string[]>([])
 const showHistory = ref(false)
@@ -41,6 +53,17 @@ function scrollToBottom() {
   })
 }
 
+function buildHistory(): { role: string; content: string }[] {
+  // Only include completed messages (skip the empty placeholder), strip tool noise
+  return messages.value
+    .filter(m => m.content && !m.content.startsWith('Error:'))
+    .map(m => ({
+      role: m.role,
+      content: m.content.replace(/\n\n> Running SQL query\.\.\.\n/g, '').trim(),
+    }))
+    .filter(m => m.content)
+}
+
 async function sendQuery(queryText?: string) {
   const q = queryText || input.value.trim()
   if (!q || isLoading.value) return
@@ -52,6 +75,8 @@ async function sendQuery(queryText?: string) {
     role: 'user',
     content: q,
     timestamp: new Date(),
+    sqlQueries: [],
+    showSql: false,
   }
   messages.value.push(userMsg)
 
@@ -62,43 +87,93 @@ async function sendQuery(queryText?: string) {
 
   scrollToBottom()
   isLoading.value = true
+  isStreaming.value = true
+
+  // Create a placeholder assistant message for streaming tokens into
+  const assistantMsg: QueryMessage = {
+    id: generateId(),
+    role: 'assistant',
+    content: '',
+    timestamp: new Date(),
+    sqlQueries: [],
+    showSql: false,
+  }
+  messages.value.push(assistantMsg)
 
   try {
-    const response = await $fetch<{
-      answer: string
-      data?: {
-        summary?: string
-        table?: { headers: string[]; rows: string[][] }
-        actions?: { label: string; link: string }[]
-      }
-    }>('/api/query', {
+    const response = await fetch('/api/query/chat', {
       method: 'POST',
-      body: { question: q },
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: q, history: buildHistory().slice(0, -2) }),
     })
 
-    const assistantMsg: QueryMessage = {
-      id: generateId(),
-      role: 'assistant',
-      content: response.answer || 'I processed your query but no results were returned.',
-      timestamp: new Date(),
-      data: response.data,
+    if (!response.ok || !response.body) throw new Error('Stream failed')
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const event = JSON.parse(line.slice(6))
+          handleSSEEvent(event, assistantMsg)
+        } catch { /* skip malformed lines */ }
+      }
     }
-    messages.value.push(assistantMsg)
+
+    // Process remaining buffer
+    if (buffer.startsWith('data: ')) {
+      try {
+        const event = JSON.parse(buffer.slice(6))
+        handleSSEEvent(event, assistantMsg)
+      } catch { /* skip */ }
+    }
+
+    if (!assistantMsg.content) {
+      assistantMsg.content = 'No response received. Please try again.'
+    }
   } catch {
-    // Fallback to mock responses for demo/offline mode
-    await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200))
-    const mock = getMockResponse(q)
-    const fallbackMsg: QueryMessage = {
-      id: generateId(),
-      role: 'assistant',
-      content: mock.answer,
-      timestamp: new Date(),
-      data: mock.data,
-    }
-    messages.value.push(fallbackMsg)
+    assistantMsg.content = 'Connection failed. Please check the server and try again.'
   } finally {
     isLoading.value = false
+    isStreaming.value = false
     scrollToBottom()
+    nextTick(() => inputEl.value?.focus())
+  }
+}
+
+function handleSSEEvent(event: { type: string; [key: string]: unknown }, msg: QueryMessage) {
+  switch (event.type) {
+    case 'token':
+      msg.content += event.content as string
+      scrollToBottom()
+      break
+    case 'tool_start':
+      msg.sqlQueries.push({ sql: event.preview as string, result: '' })
+      break
+    case 'tool_end':
+      if (msg.sqlQueries.length > 0) {
+        msg.sqlQueries[msg.sqlQueries.length - 1].result = event.result as string
+      }
+      break
+    case 'answer':
+      // Only use full answer if no tokens were streamed (fallback)
+      if (!msg.content && event.content) msg.content = event.content as string
+      scrollToBottom()
+      break
+    case 'error':
+      msg.content = `Error: ${event.message}`
+      scrollToBottom()
+      break
   }
 }
 
@@ -126,104 +201,6 @@ function formatTime(date: Date) {
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
-function getMockResponse(query: string) {
-  const q = query.toLowerCase()
-
-  if (q.includes('deposited') && (q.includes('traded') || q.includes('minimal'))) {
-    return {
-      answer: 'Found 12 accounts matching the "No Trade" pattern. These accounts deposited funds but had minimal or no trading activity before requesting withdrawals. Total exposure: $45,800.',
-      data: {
-        summary: '12 accounts flagged',
-        table: {
-          headers: ['Account ID', 'Name', 'Deposit', 'Trades', 'Withdrawal Req', 'Risk Score'],
-          rows: [
-            ['ACC-8821', 'Marcus Chen', '$5,200', '0', '$4,900', '94'],
-            ['ACC-7744', 'Elena Petrov', '$3,800', '2', '$3,650', '89'],
-            ['ACC-9102', 'David Park', '$8,100', '1', '$7,800', '92'],
-            ['ACC-6637', 'Sarah Ahmed', '$2,400', '0', '$2,300', '96'],
-            ['ACC-5519', 'James Wilson', '$6,700', '3', '$6,200', '85'],
-          ],
-        },
-        actions: [
-          { label: 'Flag All Accounts', link: '/alerts' },
-          { label: 'View Transactions', link: '/transactions' },
-        ],
-      },
-    }
-  }
-
-  if (q.includes('payment method') || q.includes('different countries') || q.includes('multiple')) {
-    return {
-      answer: 'Identified 8 customers using multiple payment methods originating from different countries. This pattern is commonly associated with card testing or money laundering schemes.',
-      data: {
-        table: {
-          headers: ['Customer', 'Payment Methods', 'Countries', 'Total Volume', 'Risk Level'],
-          rows: [
-            ['Elena Petrov', '4 cards', 'RU, CY, UK', '$12,400', 'High'],
-            ['Yuki Tanaka', '5 cards', 'JP, SG, HK, TW', '$22,100', 'High'],
-            ['James Wilson', '3 cards', 'US, MX, CA', '$8,900', 'Medium'],
-            ['Ahmed Hassan', '3 cards', 'AE, EG, QA', '$6,300', 'Medium'],
-          ],
-        },
-        actions: [
-          { label: 'Lock Accounts', link: '/alerts' },
-          { label: 'View Profiles', link: '/transactions' },
-        ],
-      },
-    }
-  }
-
-  if (q.includes('velocity')) {
-    return {
-      answer: 'Detected 3 active velocity abuse patterns in the last 7 days. These accounts show abnormally high transaction frequency, exceeding the 95th percentile threshold. Combined exposure: $67,200.',
-      data: {
-        table: {
-          headers: ['Account', 'Txns/Hour', 'Normal Rate', 'Total Amount', 'Duration'],
-          rows: [
-            ['ACC-3312', '47', '3-5', '$23,400', '6 hours'],
-            ['ACC-8891', '31', '2-4', '$28,800', '12 hours'],
-            ['ACC-2209', '22', '1-3', '$15,000', '4 hours'],
-          ],
-        },
-        actions: [
-          { label: 'Freeze Withdrawals', link: '/alerts' },
-          { label: 'Generate Report', link: '/transactions' },
-        ],
-      },
-    }
-  }
-
-  if (q.includes('approval rate') || q.includes('auto-approv')) {
-    return {
-      answer: 'This week\'s auto-approval rate is 73.2%, up from 68.5% last week (+4.7%). The improvement is driven by refined ML model thresholds deployed on Monday. 1,247 of 1,703 payouts were auto-approved with zero false negatives reported.',
-      data: {
-        table: {
-          headers: ['Day', 'Total Payouts', 'Auto-Approved', 'Escalated', 'Blocked', 'Rate'],
-          rows: [
-            ['Monday', '245', '178', '52', '15', '72.7%'],
-            ['Tuesday', '312', '231', '61', '20', '74.0%'],
-            ['Wednesday', '289', '214', '55', '20', '74.0%'],
-            ['Thursday', '267', '193', '56', '18', '72.3%'],
-            ['Friday', '248', '180', '51', '17', '72.6%'],
-            ['Saturday', '178', '132', '34', '12', '74.2%'],
-            ['Sunday', '164', '119', '33', '12', '72.6%'],
-          ],
-        },
-      },
-    }
-  }
-
-  // Default fallback
-  return {
-    answer: `Based on your query, I analyzed the current transaction data. Today we processed 847 transactions with a 73.2% auto-approval rate. The system detected 7 escalation alerts and 3 block alerts. Would you like to drill deeper into any specific area?`,
-    data: {
-      actions: [
-        { label: 'View Dashboard', link: '/' },
-        { label: 'Check Alerts', link: '/alerts' },
-      ],
-    },
-  }
-}
 </script>
 
 <template>
@@ -329,14 +306,44 @@ function getMockResponse(query: string) {
                 </div>
 
                 <!-- Assistant message -->
-                <div v-else class="space-y-3">
+                <div v-else-if="msg.content" class="space-y-3">
                   <div class="flex items-start gap-2">
                     <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100">
                       <Icon icon="lucide:bot" class="h-4 w-4 text-gray-600" />
                     </div>
                     <div class="rounded-2xl rounded-tl-md border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 shadow-sm">
-                      {{ msg.content }}
+                      <div class="prose prose-sm prose-gray max-w-none" v-html="marked.parse(msg.content || '')" />
+                      <span v-if="isStreaming && msg === messages[messages.length - 1]" class="inline-block w-2 h-4 ml-0.5 bg-primary-500 animate-pulse rounded-sm" />
                       <p class="mt-1 text-[10px] text-gray-400">{{ formatTime(msg.timestamp) }}</p>
+                    </div>
+                  </div>
+
+                  <!-- SQL Queries (collapsible) -->
+                  <div v-if="msg.sqlQueries.length > 0" class="ml-9">
+                    <button
+                      class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                      @click="msg.showSql = !msg.showSql"
+                    >
+                      <Icon :icon="msg.showSql ? 'lucide:chevron-down' : 'lucide:chevron-right'" class="h-3 w-3" />
+                      <Icon icon="lucide:database" class="h-3 w-3" />
+                      {{ msg.sqlQueries.length }} SQL {{ msg.sqlQueries.length === 1 ? 'query' : 'queries' }} executed
+                    </button>
+                    <div v-if="msg.showSql" class="mt-2 space-y-2">
+                      <div
+                        v-for="(sq, si) in msg.sqlQueries"
+                        :key="si"
+                        class="rounded-lg border border-gray-200 bg-gray-900 text-gray-100 text-xs overflow-hidden"
+                      >
+                        <div class="flex items-center justify-between border-b border-gray-700 bg-gray-800 px-3 py-1.5">
+                          <span class="font-mono text-[10px] text-gray-400">Query {{ si + 1 }}</span>
+                          <span class="rounded bg-emerald-900 px-1.5 py-0.5 text-[10px] text-emerald-300">SQL</span>
+                        </div>
+                        <pre class="p-3 overflow-x-auto font-mono leading-relaxed"><code>{{ sq.sql }}</code></pre>
+                        <div v-if="sq.result" class="border-t border-gray-700 bg-gray-800/50 p-3">
+                          <span class="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Result</span>
+                          <pre class="mt-1 overflow-x-auto font-mono text-gray-300 leading-relaxed">{{ sq.result }}</pre>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -380,16 +387,17 @@ function getMockResponse(query: string) {
               </div>
             </div>
 
-            <!-- Typing indicator -->
-            <div v-if="isLoading" class="flex items-start gap-2">
+            <!-- Typing indicator (only before first token arrives) -->
+            <div v-if="isLoading && messages[messages.length - 1]?.role === 'assistant' && !messages[messages.length - 1]?.content" class="flex items-start gap-2">
               <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100">
                 <Icon icon="lucide:bot" class="h-4 w-4 text-gray-600" />
               </div>
               <div class="rounded-2xl rounded-tl-md border border-gray-200 bg-white px-4 py-3 shadow-sm">
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-1.5 text-xs text-gray-500">
                   <span class="h-2 w-2 animate-bounce rounded-full bg-gray-400" style="animation-delay: 0ms" />
                   <span class="h-2 w-2 animate-bounce rounded-full bg-gray-400" style="animation-delay: 150ms" />
                   <span class="h-2 w-2 animate-bounce rounded-full bg-gray-400" style="animation-delay: 300ms" />
+                  <span class="ml-1">Analyzing...</span>
                 </div>
               </div>
             </div>
@@ -400,6 +408,7 @@ function getMockResponse(query: string) {
         <div class="border-t border-gray-200 p-4">
           <form class="flex items-center gap-3" @submit.prevent="sendQuery()">
             <input
+              ref="inputEl"
               v-model="input"
               type="text"
               placeholder="Ask about fraud patterns, account behavior, or transactions..."
