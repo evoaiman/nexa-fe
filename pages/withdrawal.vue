@@ -175,12 +175,9 @@ function dismissResult() {
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="showFraudNotice" class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
-        <Icon icon="lucide:loader-2" class="w-5 h-5 text-blue-600 shrink-0 animate-spin" />
-        <div>
-          <p class="text-sm font-medium text-blue-800">Running AI fraud evaluation...</p>
-          <p class="text-xs text-blue-600 mt-0.5">Analyzing 8 risk indicators including amount anomaly, velocity, geographic, and device fingerprint.</p>
-        </div>
+      <div v-if="showFraudNotice" class="flex flex-col items-center justify-center py-10">
+        <Icon icon="lucide:loader-2" class="w-8 h-8 text-primary-600 animate-spin" />
+        <p class="text-sm font-medium text-gray-600 mt-3">Processing your withdrawal...</p>
       </div>
     </Transition>
 
