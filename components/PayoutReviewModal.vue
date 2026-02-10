@@ -319,54 +319,94 @@ const paymentMethodIcon = computed(() => {
               </div>
             </div>
 
-            <!-- Gray-Zone LLM Decision -->
-            <div v-if="transaction.llm_decision" class="bg-purple-50 rounded-lg p-4 border border-purple-200">
-              <h4 class="text-sm font-semibold text-purple-800 mb-3 flex items-center gap-2">
+            <!-- Triage Constellation Analysis -->
+            <div v-if="transaction.triage" class="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
+              <h4 class="text-sm font-semibold text-indigo-800 mb-3 flex items-center gap-2">
                 <Icon icon="lucide:brain" class="w-4 h-4" />
-                Gray-Zone AI Decision
-                <span class="px-2 py-0.5 bg-purple-200 text-purple-700 rounded-full text-xs font-medium">
-                  {{ (transaction.llm_decision.confidence * 100).toFixed(0) }}% confidence
+                Triage Constellation Analysis
+                <span class="px-2 py-0.5 bg-indigo-200 text-indigo-700 rounded-full text-xs font-medium">
+                  {{ transaction.triage.elapsed_s.toFixed(1) }}s
                 </span>
               </h4>
-              <div class="space-y-2">
-                <div class="flex items-center gap-2">
-                  <span class="text-xs font-medium text-purple-600">Recommendation:</span>
-                  <span
-                    class="px-2 py-0.5 text-xs font-bold rounded-full"
-                    :class="
-                      transaction.llm_decision.recommendation === 'APPROVE' ? 'bg-green-100 text-green-700' :
-                      transaction.llm_decision.recommendation === 'BLOCK' ? 'bg-red-100 text-red-700' :
-                      'bg-yellow-100 text-yellow-700'
-                    "
-                  >
-                    {{ transaction.llm_decision.recommendation }}
-                  </span>
-                </div>
-                <p class="text-sm text-purple-900 leading-relaxed">{{ transaction.llm_decision.reasoning }}</p>
+              <p class="text-sm text-indigo-900 leading-relaxed mb-3">{{ transaction.triage.constellation_analysis }}</p>
+              <div v-if="transaction.triage.assignments.length" class="flex flex-wrap gap-2">
+                <span
+                  v-for="a in transaction.triage.assignments"
+                  :key="a.investigator"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                  :class="a.priority === 'high' ? 'bg-red-100 text-red-700' : a.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'"
+                >
+                  <Icon icon="lucide:search" class="w-3 h-3" />
+                  {{ a.investigator.replace('_', ' ') }}
+                  <span class="opacity-70">({{ a.priority }})</span>
+                </span>
               </div>
             </div>
 
-            <!-- Justification + Actions (only for non-approved transactions) -->
-            <div v-if="transaction.status !== 'approved'" class="bg-gray-50 rounded-lg p-4">
+            <!-- Investigator Findings -->
+            <div v-if="transaction.investigators?.length">
+              <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <Icon icon="lucide:search" class="w-4 h-4" />
+                Investigator Findings ({{ transaction.investigators.length }})
+              </h4>
+              <div class="grid grid-cols-1 gap-3">
+                <div
+                  v-for="inv in transaction.investigators"
+                  :key="inv.investigator_name"
+                  class="border rounded-lg p-4"
+                  :class="inv.score >= 0.7 ? 'border-red-200 bg-red-50/50' : inv.score >= 0.3 ? 'border-yellow-200 bg-yellow-50/50' : 'border-green-200 bg-green-50/50'"
+                >
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-gray-800">{{ inv.display_name }}</span>
+                    <div class="flex items-center gap-3">
+                      <span class="text-xs text-gray-400">{{ inv.elapsed_s.toFixed(1) }}s</span>
+                      <span
+                        class="text-sm font-bold"
+                        :class="getScoreTextClass(inv.score)"
+                      >
+                        {{ inv.score.toFixed(2) }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+                    <div
+                      class="h-1.5 rounded-full transition-all"
+                      :class="getScoreBarClass(inv.score)"
+                      :style="{ width: `${inv.score * 100}%` }"
+                    />
+                  </div>
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xs text-gray-500">
+                      <Icon icon="lucide:percent" class="w-3 h-3 inline" />
+                      {{ (inv.confidence * 100).toFixed(0) }}% confidence
+                    </span>
+                  </div>
+                  <p class="text-sm text-gray-700 leading-relaxed">{{ inv.reasoning }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Officer Override Info (for auto-approved) -->
+            <div v-if="transaction.status === 'approved'" class="bg-blue-50 rounded-lg p-3 border border-blue-200">
+              <div class="flex items-center gap-2 text-blue-700">
+                <Icon icon="lucide:info" class="w-4 h-4 shrink-0" />
+                <span class="text-sm">Auto-approved by AI system. You can override this decision if needed.</span>
+              </div>
+            </div>
+
+            <!-- Justification (always shown) -->
+            <div class="bg-gray-50 rounded-lg p-4">
               <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                 <Icon icon="lucide:message-square" class="w-4 h-4" />
-                Decision Justification
+                {{ transaction.status === 'approved' ? 'Override Justification' : 'Decision Justification' }}
                 <span class="text-red-500">*</span>
               </h4>
               <textarea
                 v-model="justification"
                 rows="3"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                placeholder="Provide your reasoning for the decision (required)..."
+                :placeholder="transaction.status === 'approved' ? 'Provide reason for revoking approval (required)...' : 'Provide your reasoning for the decision (required)...'"
               />
-            </div>
-
-            <!-- Auto-approved badge -->
-            <div v-else class="bg-green-50 rounded-lg p-4 border border-green-200">
-              <div class="flex items-center gap-2 text-green-700">
-                <Icon icon="lucide:check-circle" class="w-5 h-5" />
-                <span class="text-sm font-medium">Auto-approved — no human action required</span>
-              </div>
             </div>
           </div>
 
@@ -376,18 +416,19 @@ const paymentMethodIcon = computed(() => {
               class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               @click="handleClose"
             >
-              {{ transaction.status === 'approved' ? 'Close' : 'Cancel' }}
+              Cancel
             </button>
-            <div v-if="transaction.status !== 'approved'" class="flex items-center gap-3">
+            <div class="flex items-center gap-3">
               <button
                 class="px-5 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 :disabled="!justification.trim()"
                 @click="handleBlock"
               >
                 <Icon icon="lucide:ban" class="w-4 h-4" />
-                Block
+                {{ transaction.status === 'approved' ? 'Revoke & Block' : 'Block' }}
               </button>
               <button
+                v-if="transaction.status !== 'approved'"
                 class="px-5 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 :disabled="!justification.trim()"
                 @click="handleApprove"

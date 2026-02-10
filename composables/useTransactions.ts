@@ -35,11 +35,19 @@ export interface Transaction {
   risk_level: 'low' | 'medium' | 'high' | 'critical'
   status: 'pending' | 'approved' | 'escalated' | 'blocked'
   indicators: RiskIndicator[]
-  llm_decision?: {
-    reasoning: string
-    recommendation: string
-    confidence: number
+  triage?: {
+    constellation_analysis: string
+    assignments: { investigator: string; priority: string }[]
+    elapsed_s: number
   }
+  investigators?: {
+    investigator_name: string
+    display_name: string
+    score: number
+    confidence: number
+    reasoning: string
+    elapsed_s: number
+  }[]
   created_at: string
   updated_at: string
 }
@@ -59,15 +67,18 @@ export function useTransactions() {
   async function fetchTransactions() {
     isLoading.value = true
     try {
-      const data = await $fetch<{ items: Transaction[] }>('/api/transactions', {
-        params: {
-          page: 1,
-          page_size: 100,
-        },
-      })
-      if (data?.items?.length) {
-        transactions.value = data.items
-      }
+      const all: Transaction[] = []
+      let page = 1
+      let totalPages = 1
+      do {
+        const data = await $fetch<{ items: Transaction[]; total_pages: number }>('/api/transactions', {
+          params: { page, page_size: 100 },
+        })
+        if (data?.items?.length) all.push(...data.items)
+        totalPages = data?.total_pages ?? 1
+        page++
+      } while (page <= totalPages)
+      transactions.value = all
     }
     catch {
       // BE unavailable
@@ -77,10 +88,8 @@ export function useTransactions() {
     }
   }
 
-  // Fetch on init (client-side only)
-  if (import.meta.client) {
-    fetchTransactions()
-  }
+  // Poll every 10s (handles initial fetch + auto-refresh)
+  usePolling(fetchTransactions, 10000)
 
   const filteredTransactions = computed(() => {
     let result = transactions.value
