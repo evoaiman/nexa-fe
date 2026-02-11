@@ -16,6 +16,7 @@ const emit = defineEmits<{
 
 const justification = ref('')
 const expandedIndicators = ref<Set<string>>(new Set())
+const showScoringFactors = ref(false)
 
 function getScoreBarClass(score: number): string {
   if (score >= 0.7) return 'bg-red-500'
@@ -212,12 +213,21 @@ const paymentMethodIcon = computed(() => {
                   <Icon icon="lucide:activity" class="w-4 h-4" />
                   Composite Risk Score
                 </h4>
-                <span
-                  class="px-3 py-1 text-sm font-bold rounded-full"
-                  :class="[getRiskLevelBadge(transaction.risk_level).bg, getRiskLevelBadge(transaction.risk_level).text]"
-                >
-                  {{ transaction.risk_score.toFixed(2) }}
-                </span>
+                <div class="flex items-center gap-2">
+                  <button
+                    class="px-3 py-1 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
+                    @click="showScoringFactors = true"
+                  >
+                    <Icon icon="lucide:sliders-horizontal" class="w-3.5 h-3.5 inline mr-1" />
+                    See scoring factors
+                  </button>
+                  <span
+                    class="px-3 py-1 text-sm font-bold rounded-full"
+                    :class="[getRiskLevelBadge(transaction.risk_level).bg, getRiskLevelBadge(transaction.risk_level).text]"
+                  >
+                    {{ transaction.risk_score.toFixed(2) }}
+                  </span>
+                </div>
               </div>
               <div class="w-full bg-gray-200 rounded-full h-3">
                 <div
@@ -442,4 +452,12 @@ const paymentMethodIcon = computed(() => {
       </div>
     </Transition>
   </Teleport>
+
+  <ScoringFactorsDrawer
+    :visible="showScoringFactors"
+    :customer-id="transaction?.customer?.external_id ?? ''"
+    :risk-score="transaction?.risk_score ?? 0"
+    :decision="transaction?.status ?? ''"
+    @close="showScoringFactors = false"
+  />
 </template>

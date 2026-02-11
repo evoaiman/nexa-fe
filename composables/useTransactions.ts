@@ -12,6 +12,7 @@ export interface Transaction {
   id: string
   withdrawal_id: string
   customer: {
+    external_id: string
     name: string
     email: string
     country: string

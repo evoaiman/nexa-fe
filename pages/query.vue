@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { marked } from 'marked'
+import type { ChartSpec } from '~/utils/chartTransformer'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -18,6 +19,7 @@ interface QueryMessage {
   timestamp: Date
   sqlQueries: SqlQuery[]
   showSql: boolean
+  chart?: ChartSpec | null
   data?: {
     summary?: string
     table?: { headers: string[]; rows: string[][] }
@@ -34,6 +36,7 @@ const messages = ref<QueryMessage[]>([])
 const queryHistory = ref<string[]>([])
 const showHistory = ref(false)
 const sessionId = ref(generateId())
+const visualize = true
 
 const exampleQueries = [
   'Show me accounts that deposited but traded minimally',
@@ -94,7 +97,7 @@ async function sendQuery(queryText?: string) {
     const response = await fetch('/api/query/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: q, session_id: sessionId.value }),
+      body: JSON.stringify({ question: q, session_id: sessionId.value, visualize }),
     })
 
     if (!response.ok || !response.body) throw new Error('Stream failed')
@@ -141,6 +144,14 @@ async function sendQuery(queryText?: string) {
   }
 }
 
+function normalizeChartSpec(raw: unknown): ChartSpec | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  if (!r.chart_type || !r.x_key || !Array.isArray(r.series) || !Array.isArray(r.rows)) return null
+  if (!r.rows.length) return null
+  return r as unknown as ChartSpec
+}
+
 function handleSSEEvent(event: { type: string; [key: string]: unknown }, msg: QueryMessage) {
   switch (event.type) {
     case 'token':
@@ -155,6 +166,14 @@ function handleSSEEvent(event: { type: string; [key: string]: unknown }, msg: Qu
         msg.sqlQueries[msg.sqlQueries.length - 1].result = event.result as string
       }
       break
+    case 'chart': {
+      const spec = normalizeChartSpec(event.chart)
+      if (spec) {
+        msg.chart = spec
+        scrollToBottom()
+      }
+      break
+    }
     case 'answer':
       // Only use full answer if no tokens were streamed (fallback)
       if (!msg.content && event.content) msg.content = event.content as string
@@ -337,6 +356,9 @@ function formatTime(date: Date) {
                       </div>
                     </div>
                   </div>
+
+                  <!-- Inline Chart -->
+                  <ChatPlotCard v-if="msg.chart" :chart="msg.chart" class="ml-9" />
 
                   <!-- Data table -->
                   <div v-if="msg.data?.table" class="ml-9 overflow-x-auto rounded-lg border border-gray-200">
