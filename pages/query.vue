@@ -19,6 +19,7 @@ interface QueryMessage {
   timestamp: Date
   sqlQueries: SqlQuery[]
   showSql: boolean
+  showChart: boolean
   chart?: ChartSpec | null
   data?: {
     summary?: string
@@ -70,6 +71,7 @@ async function sendQuery(queryText?: string) {
     timestamp: new Date(),
     sqlQueries: [],
     showSql: false,
+    showChart: false,
   }
   messages.value.push(userMsg)
 
@@ -90,6 +92,7 @@ async function sendQuery(queryText?: string) {
     timestamp: new Date(),
     sqlQueries: [],
     showSql: false,
+    showChart: false,
   }
   messages.value.push(assistantMsg)
 
@@ -357,8 +360,18 @@ function formatTime(date: Date) {
                     </div>
                   </div>
 
-                  <!-- Inline Chart -->
-                  <ChatPlotCard v-if="msg.chart" :chart="msg.chart" class="ml-9" />
+                  <!-- Visualization (collapsible) -->
+                  <div v-if="msg.chart" class="ml-9">
+                    <button
+                      class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                      @click="msg.showChart = !msg.showChart"
+                    >
+                      <Icon :icon="msg.showChart ? 'lucide:chevron-down' : 'lucide:chevron-right'" class="h-3 w-3" />
+                      <Icon icon="lucide:chart-column" class="h-3 w-3" />
+                      Visualization result
+                    </button>
+                    <ChatPlotCard v-if="msg.showChart" :chart="msg.chart" class="mt-2" />
+                  </div>
 
                   <!-- Data table -->
                   <div v-if="msg.data?.table" class="ml-9 overflow-x-auto rounded-lg border border-gray-200">

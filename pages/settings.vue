@@ -39,6 +39,14 @@ const apiConfig = ref({
   retry_count: 3,
 })
 
+// Keep escalate_min synced with approve (they share the same boundary)
+watch(() => thresholds.value.approve, (val) => {
+  thresholds.value.escalate_min = val
+})
+watch(() => thresholds.value.block, (val) => {
+  thresholds.value.escalate_max = val
+})
+
 function weightColor(weight: number) {
   if (weight >= 1.5) return 'text-red-600'
   if (weight >= 1.2) return 'text-amber-600'
@@ -143,7 +151,47 @@ function resetDefaults() {
       </div>
     </div>
 
-    <!-- Threshold Configuration -->
+    <!-- Auto-Approve Threshold -->
+    <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div class="mb-4 flex items-center gap-2">
+        <Icon icon="lucide:zap" class="h-5 w-5 text-green-600" />
+        <h2 class="text-base font-semibold text-gray-900">Auto-Approve Threshold</h2>
+      </div>
+      <p class="mb-4 text-sm text-gray-500">
+        Transactions scoring below this threshold are automatically approved without LLM investigation.
+        Lower values are more conservative (fewer auto-approvals). Higher values process more payouts instantly.
+      </p>
+
+      <div class="rounded-lg bg-gray-50 p-4">
+        <div class="flex items-center gap-4">
+          <span class="w-10 text-sm font-medium text-gray-500">0.10</span>
+          <div class="flex-1">
+            <input
+              v-model.number="thresholds.approve"
+              type="range"
+              min="0.10"
+              max="0.50"
+              step="0.05"
+              class="w-full accent-green-600"
+            />
+          </div>
+          <span class="w-10 text-sm font-medium text-gray-500">0.50</span>
+        </div>
+        <div class="mt-2 flex items-center justify-center gap-2">
+          <span class="text-2xl font-bold text-green-700">{{ thresholds.approve.toFixed(2) }}</span>
+          <span class="text-sm text-gray-400">risk score</span>
+        </div>
+        <p class="mt-1 text-center text-xs text-gray-400">
+          Estimated auto-approval rate:
+          <span class="font-semibold" :class="thresholds.approve >= 0.30 ? 'text-green-600' : 'text-amber-600'">
+            {{ thresholds.approve >= 0.35 ? '~60%' : thresholds.approve >= 0.30 ? '~56%' : thresholds.approve >= 0.20 ? '~40%' : '~25%' }}
+          </span>
+          of clean traffic
+        </p>
+      </div>
+    </div>
+
+    <!-- Decision Thresholds -->
     <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
       <div class="mb-4 flex items-center gap-2">
         <Icon icon="lucide:sliders-horizontal" class="h-5 w-5 text-gray-600" />
@@ -174,29 +222,15 @@ function resetDefaults() {
         </div>
       </div>
 
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Approve Threshold</label>
-          <input
-            v-model.number="thresholds.approve"
-            type="number"
-            step="0.01"
-            min="0"
-            max="1"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
-          />
-          <p class="mt-1 text-xs text-gray-400">Score below this = auto-approve</p>
-        </div>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Escalate Range</label>
           <div class="flex items-center gap-2">
             <input
-              v-model.number="thresholds.escalate_min"
-              type="number"
-              step="0.01"
-              min="0"
-              max="1"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
+              :value="thresholds.approve.toFixed(2)"
+              type="text"
+              disabled
+              class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400"
             />
             <span class="text-gray-400">-</span>
             <input
@@ -208,7 +242,7 @@ function resetDefaults() {
               class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
             />
           </div>
-          <p class="mt-1 text-xs text-gray-400">Score in range = manual review</p>
+          <p class="mt-1 text-xs text-gray-400">Score in range = manual review + LLM investigation</p>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Block Threshold</label>
