@@ -22,6 +22,9 @@ export default defineNuxtConfig({
       '/api/query/chat': {
         headers: { 'X-Accel-Buffering': 'no' },
       },
+      '/api/background-audits/**/stream': {
+        headers: { 'X-Accel-Buffering': 'no' },
+      },
     },
   },
 })
