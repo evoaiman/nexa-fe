@@ -144,8 +144,14 @@ export function createEventHandlers(
 
     if (!activeClusterRef.value) return
     const toolName = String(e.metadata?.tool_name || e.metadata?.tool || e.title)
+    const argsPreview = String(e.metadata?.args_preview || '').trim()
+    const baseLabel = TOOL_LABELS[toolName]?.() || e.title
+    const friendlyLabel = toolName.includes('sql') && argsPreview
+      ? `SQL: ${argsPreview.slice(0, 120)}${argsPreview.length > 120 ? '...' : ''}`
+      : baseLabel
+
     activeClusterRef.value.toolCalls.push({
-      tool: toolName, friendlyLabel: TOOL_LABELS[toolName]?.() || e.title, timestamp: e.timestamp,
+      tool: toolName, friendlyLabel, timestamp: e.timestamp,
     })
   }
 

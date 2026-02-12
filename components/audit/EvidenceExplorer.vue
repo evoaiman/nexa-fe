@@ -2,8 +2,11 @@
 import { Icon } from '@iconify/vue'
 interface EvidenceUnit {
   source?: string
+  source_name?: string
+  source_type?: string
   text?: string
   confidence?: number
+  score?: number
   withdrawal_id?: string
   type?: string
   summary?: string
@@ -30,9 +33,11 @@ const normalizedEvidence = computed(() => {
         : 0.5
 
       return {
-        source: String(unit.source ?? unit.type ?? unit.evidence_type ?? 'evidence'),
+        source: String(unit.source_name ?? unit.source_type ?? unit.source ?? unit.type ?? unit.evidence_type ?? 'evidence'),
         text: String(unit.text ?? unit.snippet ?? unit.summary ?? unit.result ?? unit.query ?? '').trim(),
         confidence: Number(unit.confidence ?? fallbackConfidence),
+        score: Number(unit.score ?? 0),
+        rank: Number.isFinite(rank) ? rank : 999,
         withdrawal_id: String(unit.withdrawal_id ?? unit.unit_id ?? ''),
       }
     })
@@ -40,7 +45,10 @@ const normalizedEvidence = computed(() => {
 })
 
 const sortedEvidence = computed(() => {
-  return [...normalizedEvidence.value].sort((a, b) => b.confidence - a.confidence)
+  return [...normalizedEvidence.value].sort((a, b) => {
+    if (b.confidence !== a.confidence) return b.confidence - a.confidence
+    return a.rank - b.rank
+  })
 })
 
 function getConfidenceColor(confidence: number): string {
@@ -56,6 +64,14 @@ function getSourceBadgeClass(source: string): string {
   if (sourceLower.includes('cross')) return 'bg-purple-100 text-purple-700'
   if (sourceLower.includes('web')) return 'bg-orange-100 text-orange-700'
   return 'bg-gray-100 text-gray-700'
+}
+
+function formatSource(source: string): string {
+  return source
+    .replace(/[_-]+/g, ' ')
+    .split(' ')
+    .map(token => token ? token.charAt(0).toUpperCase() + token.slice(1) : token)
+    .join(' ')
 }
 </script>
 
@@ -73,7 +89,7 @@ function getSourceBadgeClass(source: string): string {
     >
       <div class="flex items-center justify-between mb-2">
         <span class="text-xs font-medium px-2 py-1 rounded-full" :class="getSourceBadgeClass(unit.source)">
-          {{ unit.source }}
+          {{ formatSource(unit.source) }}
         </span>
         <div class="flex items-center gap-1.5 text-sm">
           <span class="text-gray-600">Confidence:</span>

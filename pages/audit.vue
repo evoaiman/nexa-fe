@@ -8,7 +8,10 @@ interface RunListItem {
   run_id: string
   status: string
   started_at: string
-  counters: { candidates?: number }
+  counters: {
+    candidates?: number
+    candidates_generated?: number
+  }
 }
 
 const {
@@ -60,6 +63,12 @@ function formatRunDate(dateString: string): string {
   })
 }
 
+function getRunPatternCount(run: RunListItem): number {
+  const raw = run.counters?.candidates_generated ?? run.counters?.candidates ?? 0
+  const value = Number(raw)
+  return Number.isFinite(value) ? value : 0
+}
+
 onMounted(fetchPastRuns)
 </script>
 
@@ -100,7 +109,7 @@ onMounted(fetchPastRuns)
           >
             <option :value="null">Past Runs</option>
             <option v-for="run in pastRuns" :key="run.run_id" :value="run.run_id">
-              {{ formatRunDate(run.started_at) }} - {{ run.counters.candidates ?? 0 }} patterns
+              {{ formatRunDate(run.started_at) }} - {{ getRunPatternCount(run) }} patterns
             </option>
           </select>
           <Icon icon="lucide:chevron-down" class="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />

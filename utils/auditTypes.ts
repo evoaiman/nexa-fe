@@ -30,6 +30,7 @@ export interface SqlFinding {
   insight?: string
   query_summary?: string
   result_summary?: string
+  source?: string
 }
 
 export interface WebReference {
@@ -41,8 +42,13 @@ export interface WebReference {
 
 export interface EvidenceUnit {
   source?: string
+  source_name?: string
+  source_type?: string
   text?: string
+  text_preview?: string
   confidence?: number
+  score?: number
+  rank_score?: number
   withdrawal_id?: string
   type?: string
   summary?: string

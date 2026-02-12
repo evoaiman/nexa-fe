@@ -21,10 +21,15 @@ const evidenceItems = computed(() => {
   if (!candidate) return []
 
   const card = (candidate.pattern_card || {}) as GenericRecord
-  const raw = [
-    ...(Array.isArray(card.evidence_units) ? card.evidence_units : []),
-    ...(Array.isArray(card.ranked_evidence) ? card.ranked_evidence : []),
-  ]
+  const rankedEvidence = Array.isArray(card.ranked_evidence) ? card.ranked_evidence : []
+  const generatedEvidence = (Array.isArray(card.evidence_units) ? card.evidence_units : [])
+    .filter((item): item is GenericRecord => {
+      if (!item || typeof item !== 'object') return false
+      const type = String(item.type ?? item.source ?? '').toLowerCase()
+      return !type.includes('sql_trace') && !type.includes('web_trace')
+    })
+
+  const raw = rankedEvidence.length > 0 ? rankedEvidence : generatedEvidence
 
   const normalized = raw
     .filter((item): item is GenericRecord => !!item && typeof item === 'object')
@@ -35,17 +40,18 @@ const evidenceItems = computed(() => {
         : 0.5
 
       return {
-        source: String(item.source ?? item.type ?? item.evidence_type ?? 'evidence'),
-        text: String(item.text ?? item.snippet ?? item.summary ?? item.result ?? item.query ?? '').trim(),
+        source: String(item.source_name ?? item.source_type ?? item.source ?? item.type ?? item.evidence_type ?? 'evidence'),
+        text: String(item.text ?? item.snippet ?? item.text_preview ?? item.summary ?? item.result ?? item.query ?? '').trim(),
         confidence: Number(item.confidence ?? fallbackConfidence),
         withdrawal_id: String(item.withdrawal_id ?? item.unit_id ?? ''),
+        evidence_id: String(item.unit_id ?? ''),
       }
     })
     .filter(item => item.text.length > 0)
 
   const seen = new Set<string>()
   return normalized.filter((item) => {
-    const key = `${item.source}|${item.text}`
+    const key = item.evidence_id || `${item.source}|${item.text}`
     if (seen.has(key)) return false
     seen.add(key)
     return true
