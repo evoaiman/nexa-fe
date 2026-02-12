@@ -12,6 +12,7 @@ const emit = defineEmits<{
   close: []
   approve: [data: { id: string; justification: string }]
   block: [data: { id: string; justification: string }]
+  discuss: [data: { id: string }]
 }>()
 
 const justification = ref('')
@@ -31,13 +32,14 @@ function getScoreTextClass(score: number): string {
 }
 
 function getRiskLevelBadge(level: string) {
-  const map: Record<string, { bg: string; text: string; label: string }> = {
+  const map = {
     low: { bg: 'bg-green-100', text: 'text-green-700', label: 'Low Risk' },
     medium: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Medium Risk' },
     high: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'High Risk' },
     critical: { bg: 'bg-red-100', text: 'text-red-700', label: 'Critical Risk' },
-  }
-  return map[level] || map.low
+  } as const
+  const normalized = level.toLowerCase() as keyof typeof map
+  return map[normalized] ?? map.low
 }
 
 function getIndicatorLabel(name: string): string {
@@ -72,6 +74,11 @@ function handleBlock() {
   if (!props.transaction || !justification.value.trim()) return
   emit('block', { id: props.transaction.id, justification: justification.value })
   justification.value = ''
+}
+
+function handleDiscuss() {
+  if (!props.transaction) return
+  emit('discuss', { id: props.transaction.id })
 }
 
 function handleClose() {
@@ -123,9 +130,9 @@ const paymentMethodIcon = computed(() => {
             <div class="flex items-center gap-3">
               <span
                 class="px-3 py-1 text-xs font-medium rounded-full"
-                :class="[getRiskLevelBadge(transaction.risk_level).bg, getRiskLevelBadge(transaction.risk_level).text]"
+                :class="[getRiskLevelBadge(transaction?.risk_level ?? 'low').bg, getRiskLevelBadge(transaction?.risk_level ?? 'low').text]"
               >
-                {{ getRiskLevelBadge(transaction.risk_level).label }}
+                {{ getRiskLevelBadge(transaction?.risk_level ?? 'low').label }}
               </span>
               <button class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" @click="handleClose">
                 <Icon icon="lucide:x" class="w-5 h-5 text-gray-400" />
@@ -223,7 +230,7 @@ const paymentMethodIcon = computed(() => {
                   </button>
                   <span
                     class="px-3 py-1 text-sm font-bold rounded-full"
-                    :class="[getRiskLevelBadge(transaction.risk_level).bg, getRiskLevelBadge(transaction.risk_level).text]"
+                    :class="[getRiskLevelBadge(transaction?.risk_level ?? 'low').bg, getRiskLevelBadge(transaction?.risk_level ?? 'low').text]"
                   >
                     {{ transaction.risk_score.toFixed(2) }}
                   </span>
@@ -429,6 +436,12 @@ const paymentMethodIcon = computed(() => {
               Cancel
             </button>
             <div class="flex items-center gap-3">
+              <button
+                class="px-5 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
+                @click="handleDiscuss"
+              >
+                Discuss
+              </button>
               <button
                 class="px-5 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 :disabled="!justification.trim()"

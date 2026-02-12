@@ -69,7 +69,7 @@ function getRunPatternCount(run: RunListItem): number {
   return Number.isFinite(value) ? value : 0
 }
 
-onMounted(fetchPastRuns)
+usePolling(fetchPastRuns, 5000)
 </script>
 
 <template>
