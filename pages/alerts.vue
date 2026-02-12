@@ -6,7 +6,7 @@ useHead({ title: 'Alerts - Nexa' })
 
 interface Alert {
   id: string
-  type: 'escalation' | 'block'
+  type: 'escalation' | 'block' | 'card_lockdown'
   customer_name: string
   account_id: string
   risk_score: number
@@ -15,6 +15,17 @@ interface Alert {
   read: boolean
   amount: number
   currency: string
+}
+
+interface LinkedAccount {
+  customer_id: string
+  customer_name: string
+}
+
+interface LockdownResult {
+  affected_count: number
+  affected_customers: string[]
+  affected_accounts?: LinkedAccount[]
 }
 
 interface FraudPattern {
@@ -42,6 +53,10 @@ const selectedIds = ref<Set<string>>(new Set())
 const selectedAlert = ref<Alert | null>(null)
 const showDetail = ref(false)
 const bulkLoading = ref(false)
+const lockdownLoading = ref(false)
+const lockdownResult = ref<LockdownResult | null>(null)
+const cardCheckCache = ref<Record<string, { shared: boolean; linked_count: number; linked_accounts: LinkedAccount[] }>>({})
+const cardCheckLoading = ref(false)
 
 const fraudPatterns: FraudPattern[] = [
   { name: 'No Trade Pattern', key: 'no_trade', accounts_affected: 12, total_exposure: 45800, confidence: 94 },
@@ -82,9 +97,29 @@ function toggleAll() {
   }
 }
 
-function openDetail(alert: Alert) {
+async function openDetail(alert: Alert) {
   selectedAlert.value = alert
   showDetail.value = true
+  lockdownResult.value = null
+  await fetchCardCheck(alert.account_id)
+}
+
+async function fetchCardCheck(accountId: string) {
+  if (cardCheckCache.value[accountId]) return
+  cardCheckLoading.value = true
+  try {
+    const result = await $fetch<{ shared: boolean; linked_count: number; linked_accounts?: LinkedAccount[] }>(
+      `/api/alerts/card-check/${accountId}`,
+    )
+    cardCheckCache.value[accountId] = {
+      ...result,
+      linked_accounts: result.linked_accounts ?? [],
+    }
+  } catch {
+    cardCheckCache.value[accountId] = { shared: false, linked_count: 0, linked_accounts: [] }
+  } finally {
+    cardCheckLoading.value = false
+  }
 }
 
 async function bulkAction(action: string) {
@@ -102,6 +137,26 @@ async function bulkAction(action: string) {
   }
 }
 
+async function triggerCardLockdown() {
+  if (!selectedAlert.value) return
+  lockdownLoading.value = true
+  try {
+    const result = await $fetch<LockdownResult>('/api/alerts/card-lockdown', {
+      method: 'POST',
+      body: {
+        customer_id: selectedAlert.value.account_id,
+        risk_score: selectedAlert.value.risk_score / 100,
+      },
+    })
+    lockdownResult.value = result
+    await refresh()
+  } catch {
+    lockdownResult.value = { affected_count: 0, affected_customers: [], affected_accounts: [] }
+  } finally {
+    lockdownLoading.value = false
+  }
+}
+
 function relativeTime(ts: string) {
   const diff = Date.now() - new Date(ts).getTime()
   const mins = Math.floor(diff / 60000)
@@ -112,6 +167,14 @@ function relativeTime(ts: string) {
   return formatDate(ts, 'MMM dd')
 }
 
+watch(alerts, (list) => {
+  for (const a of list) {
+    if (!(a.account_id in cardCheckCache.value)) {
+      fetchCardCheck(a.account_id)
+    }
+  }
+}, { immediate: true })
+
 const indicatorLabels: Record<string, string> = {
   amount_anomaly: 'Amount Anomaly',
   velocity: 'Velocity',
@@ -121,6 +184,32 @@ const indicatorLabels: Record<string, string> = {
   trading_behavior: 'Trading Behavior',
   recipient: 'Recipient Risk',
   card_errors: 'Card Errors',
+}
+
+function hasSharedCard(alert: Alert): boolean {
+  const cached = cardCheckCache.value[alert.account_id]
+  return cached?.shared ?? false
+}
+
+function linkedAccounts(alert: Alert): LinkedAccount[] {
+  return cardCheckCache.value[alert.account_id]?.linked_accounts ?? []
+}
+
+function linkedAccountsSummary(alert: Alert): string {
+  const linked = linkedAccounts(alert)
+  if (linked.length === 0) return ''
+
+  const preview = linked
+    .slice(0, 2)
+    .map(account => `${account.customer_name} (${account.customer_id})`)
+
+  return linked.length > 2
+    ? `${preview.join(', ')} +${linked.length - 2} more`
+    : preview.join(', ')
+}
+
+function cardCheckDone(alert: Alert): boolean {
+  return alert.account_id in cardCheckCache.value
 }
 
 const patternIcons: Record<string, string> = {
@@ -217,7 +306,7 @@ const patternIcons: Record<string, string> = {
             <div
               v-for="alert in alerts"
               :key="alert.id"
-              :class="['flex items-start gap-3 px-4 py-3 transition-colors hover:bg-gray-50 cursor-pointer', !alert.read && 'bg-blue-50/30']"
+              :class="['flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-gray-50 cursor-pointer', !alert.read && 'bg-blue-50/30']"
               @click="openDetail(alert)"
             >
               <input
@@ -238,13 +327,32 @@ const patternIcons: Record<string, string> = {
                   <span v-if="!alert.read" class="h-2 w-2 rounded-full bg-blue-500" />
                 </div>
 
-                <div class="mt-1 flex flex-wrap gap-1">
+                <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <span
                     v-for="ind in alert.indicators.slice(0, 3)"
                     :key="ind.name"
                     class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600"
                   >
                     {{ indicatorLabels[ind.name] || ind.name }}: {{ ind.score }}
+                  </span>
+                  <span
+                    v-if="cardCheckDone(alert) && hasSharedCard(alert)"
+                    class="inline-flex items-center gap-0.5 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-700"
+                  >
+                    <Icon icon="lucide:credit-card" class="h-2.5 w-2.5" />
+                    Shared card ({{ cardCheckCache[alert.account_id]?.linked_count }})
+                  </span>
+                  <span
+                    v-if="cardCheckDone(alert) && hasSharedCard(alert)"
+                    class="rounded bg-orange-50 px-1.5 py-0.5 text-[10px] text-orange-700"
+                  >
+                    Connected to: {{ linkedAccountsSummary(alert) }}
+                  </span>
+                  <span
+                    v-else-if="cardCheckDone(alert)"
+                    class="rounded bg-gray-50 px-1.5 py-0.5 text-[10px] text-gray-400"
+                  >
+                    No card match
                   </span>
                 </div>
               </div>
@@ -304,35 +412,52 @@ const patternIcons: Record<string, string> = {
         leave-to-class="opacity-0"
       >
         <div v-if="showDetail && selectedAlert" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @click.self="showDetail = false">
-          <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-            <div class="flex items-center justify-between">
+          <div class="w-full max-w-lg rounded-2xl bg-white shadow-xl overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100">
               <h3 class="text-lg font-bold text-gray-900">Alert Details</h3>
-              <button class="rounded-lg p-1 hover:bg-gray-100" @click="showDetail = false">
+              <button class="rounded-lg p-1.5 hover:bg-gray-100" @click="showDetail = false">
                 <Icon icon="lucide:x" class="h-5 w-5 text-gray-500" />
               </button>
             </div>
 
-            <div class="mt-4 space-y-4">
+            <div class="px-6 py-5 space-y-5">
               <!-- Customer Info -->
-              <div class="rounded-lg bg-gray-50 p-3">
+              <div class="rounded-lg bg-gray-50 p-4">
                 <p class="text-sm font-semibold text-gray-800">{{ selectedAlert.customer_name }}</p>
-                <p class="text-xs text-gray-500">Account: {{ selectedAlert.account_id }}</p>
-                <div class="mt-2 flex items-center gap-2">
+                <p class="text-xs text-gray-500 mt-0.5">Account: {{ selectedAlert.account_id }}</p>
+                <div class="mt-2.5 flex items-center gap-2">
                   <span class="rounded px-1.5 py-0.5 text-xs font-bold uppercase" :class="typeBadge(selectedAlert.type)">{{ selectedAlert.type }}</span>
                   <span class="rounded-full px-2 py-0.5 text-xs font-bold" :class="riskColor(selectedAlert.risk_score)">Risk: {{ selectedAlert.risk_score }}</span>
                 </div>
               </div>
 
+              <div
+                v-if="linkedAccounts(selectedAlert).length > 0"
+                class="rounded-lg border border-orange-200 bg-orange-50 p-4"
+              >
+                <p class="text-xs font-semibold uppercase tracking-wider text-orange-700">Connected Accounts</p>
+                <ul class="mt-2 space-y-1.5">
+                  <li
+                    v-for="account in linkedAccounts(selectedAlert)"
+                    :key="account.customer_id"
+                    class="flex items-center justify-between rounded bg-white px-2 py-1 text-xs text-orange-900"
+                  >
+                    <span class="font-medium">{{ account.customer_name }}</span>
+                    <span class="text-orange-700">{{ account.customer_id }}</span>
+                  </li>
+                </ul>
+              </div>
+
               <!-- Transaction -->
               <div>
-                <p class="text-xs font-semibold text-gray-500 uppercase">Triggered By</p>
-                <p class="text-sm text-gray-700">Withdrawal of <span class="font-bold">{{ formatCurrency(selectedAlert.amount, selectedAlert.currency) }}</span></p>
-                <p class="text-xs text-gray-400">{{ formatDate(selectedAlert.timestamp) }}</p>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Triggered By</p>
+                <p class="text-sm text-gray-700 mt-1.5">Withdrawal of <span class="font-bold">{{ formatCurrency(selectedAlert.amount, selectedAlert.currency) }}</span></p>
+                <p class="text-xs text-gray-400 mt-0.5">{{ formatDate(selectedAlert.timestamp) }}</p>
               </div>
 
               <!-- Indicator Scores -->
               <div>
-                <p class="mb-2 text-xs font-semibold text-gray-500 uppercase">Indicator Scores</p>
+                <p class="mb-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Indicator Scores</p>
                 <div class="space-y-2">
                   <div v-for="ind in selectedAlert.indicators" :key="ind.name" class="flex items-center gap-2">
                     <span class="w-28 truncate text-xs text-gray-600">{{ indicatorLabels[ind.name] || ind.name }}</span>
@@ -348,18 +473,60 @@ const patternIcons: Record<string, string> = {
                 </div>
               </div>
 
-              <!-- Actions -->
-              <div class="flex gap-2 pt-2">
-                <button class="flex-1 rounded-lg bg-primary-600 py-2 text-sm font-medium text-white hover:bg-primary-700">
-                  View Customer
-                </button>
-                <button class="flex-1 rounded-lg border border-red-300 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
-                  Lock Account
-                </button>
-                <button class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50" @click="showDetail = false">
-                  Dismiss
-                </button>
+              <!-- Card Lockdown Result -->
+              <div v-if="lockdownResult" class="rounded-lg border p-4" :class="lockdownResult.affected_count > 0 ? 'border-orange-200 bg-orange-50' : 'border-gray-200 bg-gray-50'">
+                <p class="text-sm font-semibold" :class="lockdownResult.affected_count > 0 ? 'text-orange-800' : 'text-gray-700'">
+                  <Icon icon="lucide:shield-alert" class="mr-1 inline h-4 w-4" />
+                  {{ lockdownResult.affected_count > 0 ? 'Card Lockdown Executed' : 'No Linked Accounts Found' }}
+                </p>
+                <div v-if="lockdownResult.affected_count > 0" class="mt-1.5 text-xs text-orange-700">
+                  <p>{{ lockdownResult.affected_count }} account(s) locked:</p>
+                  <ul
+                    v-if="(lockdownResult.affected_accounts?.length ?? 0) > 0"
+                    class="mt-1.5 space-y-1"
+                  >
+                    <li
+                      v-for="account in lockdownResult.affected_accounts"
+                      :key="account.customer_id"
+                      class="flex items-center justify-between rounded bg-white px-2 py-1 text-orange-900"
+                    >
+                      <span class="font-medium">{{ account.customer_name }}</span>
+                      <span>{{ account.customer_id }}</span>
+                    </li>
+                  </ul>
+                  <p v-else class="mt-1.5">
+                    {{ lockdownResult.affected_customers.join(', ') }}
+                  </p>
+                </div>
+                <p v-else class="mt-1.5 text-xs text-gray-500">
+                  No other accounts share a card with this customer.
+                </p>
               </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+              <button class="flex-1 rounded-lg bg-primary-600 py-2.5 text-sm font-medium text-white hover:bg-primary-700">
+                View Customer
+              </button>
+              <button class="flex-1 rounded-lg border border-red-300 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50">
+                Lock Account
+              </button>
+              <button
+                class="flex-1 rounded-lg border py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                :class="selectedAlert && hasSharedCard(selectedAlert)
+                  ? 'border-orange-300 text-orange-600 hover:bg-orange-50'
+                  : 'border-gray-200 text-gray-400'"
+                :disabled="lockdownLoading || cardCheckLoading || !selectedAlert || !hasSharedCard(selectedAlert)"
+                :title="selectedAlert && !hasSharedCard(selectedAlert) ? 'No shared card found for this customer' : ''"
+                @click="triggerCardLockdown"
+              >
+                <Icon icon="lucide:credit-card" class="mr-1 inline h-3.5 w-3.5" />
+                Card Lockdown
+              </button>
+              <button class="rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-500 hover:bg-gray-50" @click="showDetail = false">
+                Dismiss
+              </button>
             </div>
           </div>
         </div>
