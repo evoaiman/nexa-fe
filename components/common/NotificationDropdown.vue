@@ -1,14 +1,24 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 
+interface Notification {
+  id: string
+  title: string
+  time: string
+  read: boolean
+  type: string
+}
+
 const isOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
 
-const notifications = ref([
-  { id: 1, title: 'High-risk payout flagged', time: '2 min ago', read: false },
-  { id: 2, title: 'Fraud pattern detected', time: '15 min ago', read: false },
-  { id: 3, title: 'Bulk action completed', time: '1 hour ago', read: true },
+const notifications = ref<Notification[]>([
+  { id: '1', title: 'High-risk payout flagged', time: '2 min ago', read: false, type: 'block' },
+  { id: '2', title: 'Fraud pattern detected', time: '15 min ago', read: false, type: 'escalation' },
+  { id: '3', title: 'Bulk action completed', time: '1 hour ago', read: true, type: 'info' },
 ])
+
+let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
 
@@ -16,7 +26,7 @@ function toggle() {
   isOpen.value = !isOpen.value
 }
 
-function markRead(id: number) {
+function markRead(id: string) {
   const n = notifications.value.find(n => n.id === id)
   if (n) n.read = true
 }
@@ -27,12 +37,45 @@ function handleClickOutside(e: MouseEvent) {
   }
 }
 
+async function fetchNotifications() {
+  try {
+    const data = await $fetch<{ alerts: any[] }>('/api/alerts')
+    const recent = (data.alerts ?? []).slice(0, 5)
+    notifications.value = recent.map(a => ({
+      id: a.id,
+      title: a.type === 'card_lockdown'
+        ? `Card lockdown: ${a.customer_name}`
+        : a.type === 'block'
+          ? `Blocked: ${a.customer_name}`
+          : `Escalated: ${a.customer_name}`,
+      time: relativeTime(a.timestamp),
+      read: a.read,
+      type: a.type,
+    }))
+  } catch {
+    // keep existing notifications on error
+  }
+}
+
+function relativeTime(ts: string): string {
+  const diff = Date.now() - new Date(ts).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  fetchNotifications()
+  pollTimer = setInterval(fetchNotifications, 30000)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  if (pollTimer) clearInterval(pollTimer)
 })
 </script>
 
@@ -73,8 +116,17 @@ onUnmounted(() => {
             :class="['cursor-pointer px-4 py-3 transition-colors hover:bg-gray-50', !n.read && 'bg-primary-50/40']"
             @click="markRead(n.id)"
           >
-            <p class="text-sm font-medium text-gray-800">{{ n.title }}</p>
-            <p class="mt-0.5 text-xs text-gray-400">{{ n.time }}</p>
+            <div class="flex items-start gap-2.5">
+              <Icon
+                :icon="n.type === 'card_lockdown' ? 'lucide:credit-card' : n.type === 'block' ? 'lucide:shield-off' : 'lucide:alert-triangle'"
+                class="mt-0.5 h-4 w-4 shrink-0"
+                :class="n.type === 'card_lockdown' ? 'text-orange-500' : n.type === 'block' ? 'text-red-500' : 'text-amber-500'"
+              />
+              <div>
+                <p class="text-sm font-medium text-gray-800">{{ n.title }}</p>
+                <p class="mt-0.5 text-xs text-gray-400">{{ n.time }}</p>
+              </div>
+            </div>
           </li>
         </ul>
       </div>
