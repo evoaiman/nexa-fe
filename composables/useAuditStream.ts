@@ -24,19 +24,20 @@ interface SSEEventPayload {
   phase?: string | null
   title: string
   detail?: string | null
+  narration?: string | null
   progress?: number | null
   metadata?: Record<string, unknown>
   timestamp: string
 }
 
 const PHASES: Array<{ name: string, label: string }> = [
-  { name: 'extract', label: 'Extract Fraud Evidence' },
-  { name: 'embed_cluster', label: 'Embed & Cluster' },
-  { name: 'investigate', label: 'Investigate Clusters' },
-  { name: 'artifacts', label: 'Write Artifacts' },
+  { name: 'extract', label: 'Scanning Transactions' },
+  { name: 'embed_cluster', label: 'Grouping Patterns' },
+  { name: 'investigate', label: 'Deep-Dive Analysis' },
+  { name: 'artifacts', label: 'Compiling Report' },
 ]
 
-const STREAM_EVENT_TYPES = ['phase_start', 'progress', 'hypothesis', 'agent_tool', 'candidate', 'complete', 'error'] as const
+const STREAM_EVENT_TYPES = ['phase_start', 'progress', 'hypothesis', 'agent_tool', 'insight', 'candidate', 'complete', 'error'] as const
 
 function buildInitialPhases(): Phase[] {
   return PHASES.map(phase => ({
@@ -69,6 +70,7 @@ function parseSSEPayload(data: string, fallbackType: string): SSEEventPayload | 
       phase: parsed.phase ?? null,
       title: String(parsed.title || fallbackType),
       detail: parsed.detail ?? null,
+      narration: (parsed as Record<string, unknown>).narration as string | null ?? null,
       progress: parsed.progress ?? null,
       metadata: parsed.metadata ?? {},
       timestamp: String(parsed.timestamp || new Date().toISOString()),
@@ -137,6 +139,9 @@ function dispatchEvent(event: SSEEventPayload): void {
       break
     case 'agent_tool':
       handlers.onAgentTool(event)
+      break
+    case 'insight':
+      handlers.onInsight(event)
       break
     case 'candidate':
       handlers.onCandidate(event)

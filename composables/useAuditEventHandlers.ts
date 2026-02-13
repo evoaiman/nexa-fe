@@ -6,6 +6,7 @@ interface SSEEvent {
   phase?: string | null
   title: string
   detail?: string | null
+  narration?: string | null
   progress?: number | null
   metadata?: Record<string, unknown>
   timestamp: string
@@ -127,7 +128,7 @@ export function createEventHandlers(
 
     const c: ClusterStep = {
       clusterId: String(m.cluster_id || clusters.value.length),
-      label: e.title, status: 'active',
+      label: e.narration || e.title, status: 'active',
       eventCount: Number(m.event_count || m.unit_count || 0),
       accountCount: Number(m.account_count || 0),
       sourceType: sourceTypes.join(',') || 'unknown',
@@ -144,14 +145,25 @@ export function createEventHandlers(
 
     if (!activeClusterRef.value) return
     const toolName = String(e.metadata?.tool_name || e.metadata?.tool || e.title)
-    const argsPreview = String(e.metadata?.args_preview || '').trim()
-    const baseLabel = TOOL_LABELS[toolName]?.() || e.title
-    const friendlyLabel = toolName.includes('sql') && argsPreview
-      ? `SQL: ${argsPreview.slice(0, 120)}${argsPreview.length > 120 ? '...' : ''}`
-      : baseLabel
+    const narration = e.narration || null
+    const friendlyLabel = narration || TOOL_LABELS[toolName]?.() || e.title
 
     activeClusterRef.value.toolCalls.push({
-      tool: toolName, friendlyLabel, timestamp: e.timestamp,
+      tool: toolName, friendlyLabel, narration, timestamp: e.timestamp, kind: 'tool',
+    })
+  }
+
+  function onInsight(e: SSEEvent): void {
+    ensureInvestigateActive(e.timestamp)
+
+    if (!activeClusterRef.value) return
+    const narration = e.narration || e.title
+    activeClusterRef.value.toolCalls.push({
+      tool: 'insight',
+      friendlyLabel: narration,
+      narration,
+      timestamp: e.timestamp,
+      kind: 'insight',
     })
   }
 
@@ -208,6 +220,6 @@ export function createEventHandlers(
   }
 
   return {
-    onPhaseStart, onProgress, onHypothesis, onAgentTool, onCandidate, onComplete, onError,
+    onPhaseStart, onProgress, onHypothesis, onAgentTool, onInsight, onCandidate, onComplete, onError,
   }
 }

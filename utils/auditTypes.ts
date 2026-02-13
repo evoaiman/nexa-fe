@@ -10,7 +10,9 @@ export interface Phase {
 export interface ToolCall {
   tool: string
   friendlyLabel: string
+  narration: string | null
   timestamp: string
+  kind: 'tool' | 'insight'
 }
 
 export interface ClusterStep {

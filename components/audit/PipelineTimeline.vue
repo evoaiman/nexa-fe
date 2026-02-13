@@ -1,29 +1,5 @@
 <script setup lang="ts">
-interface Phase {
-  name: string
-  label: string
-  status: 'pending' | 'active' | 'completed'
-  detail: string | null
-  startedAt: string | null
-  duration: number | null
-}
-
-interface ClusterStep {
-  clusterId: string
-  label: string
-  status: 'pending' | 'active' | 'completed'
-  eventCount: number
-  accountCount: number
-  sourceType: string
-  toolCalls: ToolCall[]
-  patternName: string | null
-}
-
-interface ToolCall {
-  tool: string
-  friendlyLabel: string
-  timestamp: string
-}
+import type { Phase, ClusterStep } from '~/utils/auditTypes'
 
 interface Props {
   phases: Phase[]

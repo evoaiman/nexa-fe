@@ -10,7 +10,7 @@ interface Props {
 
 const props = defineProps<Props>()
 
-type TabName = 'summary' | 'evidence' | 'sql' | 'web' | 'notes'
+type TabName = 'summary' | 'evidence' | 'sql' | 'web'
 
 const activeTab = ref<TabName>('summary')
 
@@ -82,12 +82,6 @@ const tabs = computed(() => {
       icon: 'lucide:globe',
       show: (candidate.pattern_card.web_references?.length ?? 0) > 0
     },
-    {
-      name: 'notes' as TabName,
-      label: 'Agent Notes',
-      icon: 'lucide:brain',
-      show: !!candidate.pattern_card.analyst_notes
-    }
   ].filter((tab) => tab.show)
 })
 
@@ -133,27 +127,45 @@ watch(
           v-else-if="activeTab === 'web'"
           :references="selectedCandidate.pattern_card.web_references ?? []"
         />
-        <AuditAgentReasoning v-else-if="activeTab === 'notes'" :candidate="selectedCandidate" />
       </div>
     </div>
 
     <div v-else-if="status === 'streaming' && selectedCluster" class="flex-1 flex flex-col p-5">
-      <div class="flex items-center gap-2 mb-4">
+      <div class="flex items-center gap-2 mb-1">
         <Icon icon="lucide:brain" class="h-5 w-5 text-primary-500 animate-pulse" />
-        <h3 class="text-sm font-semibold text-gray-700">The agent is investigating...</h3>
+        <h3 class="text-sm font-semibold text-gray-700">Agent Investigation</h3>
       </div>
-      <div class="space-y-2">
+      <p v-if="selectedCluster.toolCalls.length === 0" class="text-xs text-gray-400 mb-4">
+        Starting analysis...
+      </p>
+      <div class="space-y-3 mt-3">
         <div
           v-for="(call, idx) in selectedCluster.toolCalls"
           :key="idx"
-          class="flex items-center gap-2 text-sm text-gray-600"
+          class="flex items-start gap-3 text-sm"
+          :class="call.kind === 'insight'
+            ? 'bg-emerald-50 border border-emerald-200 rounded-lg p-3'
+            : 'text-gray-600'"
         >
           <Icon
-            :icon="call.tool.includes('web') || call.tool.includes('tavily') ? 'lucide:globe' : 'lucide:database'"
-            class="h-4 w-4 text-gray-400"
+            :icon="call.kind === 'insight'
+              ? 'lucide:lightbulb'
+              : call.tool.includes('web') || call.tool.includes('tavily')
+                ? 'lucide:globe'
+                : call.tool.includes('cluster') || call.tool.includes('kmeans')
+                  ? 'lucide:git-branch'
+                  : 'lucide:database'"
+            class="h-4 w-4 flex-shrink-0 mt-0.5"
+            :class="call.kind === 'insight' ? 'text-emerald-600' : 'text-gray-400'"
           />
-          <span>{{ call.friendlyLabel }}</span>
-          <span class="text-xs text-gray-400">{{ call.timestamp }}</span>
+          <div class="flex-1 min-w-0">
+            <span
+              class="leading-relaxed"
+              :class="call.kind === 'insight' ? 'text-emerald-700 font-medium' : ''"
+            >
+              {{ call.friendlyLabel }}
+            </span>
+          </div>
         </div>
       </div>
     </div>

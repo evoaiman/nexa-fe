@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { friendlySourceLabel, severityFromConfidence } from '~/utils/auditHelpers'
+
 interface CandidateResult {
   candidate_id: string
   title: string | null
@@ -7,6 +9,7 @@ interface CandidateResult {
   confidence: number
   support_events: number
   novelty_status: string
+  support_accounts?: number
   pattern_card: {
     formal_pattern_name?: string
     plain_language?: string
@@ -27,37 +30,26 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
-const riskDotColor = computed(() => {
-  if (props.candidate.confidence >= 0.7) return 'bg-red-500'
-  if (props.candidate.confidence >= 0.4) return 'bg-yellow-500'
-  return 'bg-green-500'
-})
-
-const noveltyBadgeClass = computed(() => {
-  switch (props.candidate.novelty_status) {
-    case 'new':
-      return 'bg-green-100 text-green-700'
-    case 'known':
-      return 'bg-gray-100 text-gray-700'
-    default:
-      return 'bg-yellow-100 text-yellow-700'
-  }
-})
+const severity = computed(() => severityFromConfidence(props.candidate.confidence))
 
 const patternName = computed(() => {
   return props.candidate.pattern_card.formal_pattern_name || props.candidate.title || 'Unnamed Pattern'
 })
 
-const sourcesText = computed(() => {
-  const sources = props.candidate.pattern_card.source_types || []
-  if (sources.length === 0) return 'No sources'
-  const joined = sources.join(', ')
-  return joined.length > 30 ? joined.substring(0, 30) + '...' : joined
+const briefSnippet = computed(() => {
+  const text = (props.candidate.pattern_card.plain_language ?? '').trim()
+  return text.length > 90 ? text.substring(0, 87) + '...' : text
 })
 
-const qualityPercent = computed(() => Math.round(props.candidate.quality_score * 100))
-const confidencePercent = computed(() => Math.round(props.candidate.confidence * 100))
-const supportAccounts = computed(() => props.candidate.pattern_card.support_accounts || 0)
+const friendlySources = computed(() => {
+  return (props.candidate.pattern_card.source_types || [])
+    .map(friendlySourceLabel)
+    .join(', ')
+})
+
+const supportAccounts = computed(() => {
+  return props.candidate.support_accounts ?? props.candidate.pattern_card.support_accounts ?? 0
+})
 </script>
 
 <template>
@@ -67,40 +59,47 @@ const supportAccounts = computed(() => props.candidate.pattern_card.support_acco
     :class="{ 'ring-2 ring-primary-500 border-primary-300': isSelected }"
   >
     <div class="flex items-start justify-between gap-2">
-      <h3 class="text-sm font-semibold text-gray-900 flex-1">
+      <h3 class="text-sm font-semibold text-gray-900 flex-1 leading-snug">
         {{ patternName }}
       </h3>
-      <div :class="riskDotColor" class="mt-1 h-2 w-2 rounded-full flex-shrink-0" />
-    </div>
-
-    <div class="mt-3 space-y-1.5">
-      <div class="flex items-center justify-between text-xs">
-        <span class="text-gray-600">Quality:</span>
-        <span class="font-medium text-gray-900">{{ qualityPercent }}%</span>
-      </div>
-      <div class="flex items-center justify-between text-xs">
-        <span class="text-gray-600">Confidence:</span>
-        <span class="font-medium text-gray-900">{{ confidencePercent }}%</span>
-      </div>
-    </div>
-
-    <div class="mt-2 flex items-center gap-2 text-xs text-gray-600">
-      <span>{{ candidate.support_events }} events</span>
-      <span>·</span>
-      <span>{{ supportAccounts }} accts</span>
-    </div>
-
-    <div class="mt-2">
       <span
-        :class="noveltyBadgeClass"
-        class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
+        :class="severity.class"
+        class="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide flex-shrink-0"
       >
-        {{ candidate.novelty_status }} pattern
+        {{ severity.label }}
       </span>
     </div>
 
-    <div class="mt-2 text-xs text-gray-500 truncate">
-      {{ sourcesText }}
+    <p v-if="briefSnippet" class="mt-1.5 text-xs text-gray-500 leading-relaxed">
+      {{ briefSnippet }}
+    </p>
+
+    <div class="mt-3 flex items-center gap-3 text-xs text-gray-600">
+      <span class="font-medium">{{ candidate.support_events }} events</span>
+      <span class="text-gray-300">|</span>
+      <span class="font-medium">{{ supportAccounts }} accounts</span>
+    </div>
+
+    <div class="mt-2.5 flex items-center gap-2 flex-wrap">
+      <span
+        :class="severity.badgeClass"
+        class="rounded-full px-2 py-0.5 text-[10px] font-medium"
+      >
+        {{ Math.round(candidate.confidence * 100) }}% confidence
+      </span>
+      <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+        {{ Math.round(candidate.quality_score * 100) }}% quality
+      </span>
+      <span
+        v-if="candidate.novelty_status === 'new'"
+        class="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700"
+      >
+        New pattern
+      </span>
+    </div>
+
+    <div v-if="friendlySources" class="mt-2 text-[11px] text-gray-400 truncate">
+      {{ friendlySources }}
     </div>
   </div>
 </template>

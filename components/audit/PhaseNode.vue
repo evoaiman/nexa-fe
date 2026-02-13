@@ -1,14 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-
-interface Phase {
-  name: string
-  label: string
-  status: 'pending' | 'active' | 'completed'
-  detail: string | null
-  startedAt: string | null
-  duration: number | null
-}
+import type { Phase } from '~/utils/auditTypes'
 
 interface Props {
   phase: Phase
@@ -18,19 +10,19 @@ const props = defineProps<Props>()
 
 const phaseLabels: Record<string, { active: string; completed: string }> = {
   extract: {
-    active: 'Reading past fraud investigations...',
-    completed: 'Evidence extracted'
+    active: 'Scanning recent transactions for suspicious activity...',
+    completed: 'Evidence collected'
   },
   embed_cluster: {
-    active: 'Finding similar patterns...',
-    completed: 'Clusters discovered'
+    active: 'Grouping similar suspicious patterns together...',
+    completed: 'Patterns grouped'
   },
   investigate: {
-    active: 'AI agent investigating each cluster...',
-    completed: 'Patterns identified'
+    active: 'AI agent deep-diving into each pattern...',
+    completed: 'Analysis complete'
   },
   artifacts: {
-    active: 'Saving results...',
+    active: 'Compiling the findings report...',
     completed: 'Report ready'
   }
 }
