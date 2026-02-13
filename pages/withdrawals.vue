@@ -42,8 +42,8 @@ async function submitDecisionToBE(tx: Transaction, action: 'approved' | 'blocked
     await $fetch('/api/payout/decision', {
       method: 'POST',
       body: {
-        withdrawal_id: tx.withdrawal_id || crypto.randomUUID(),
-        evaluation_id: crypto.randomUUID(),
+        withdrawal_id: tx.withdrawal_id,
+        evaluation_id: tx.evaluation_id,
         officer_id: 'officer-demo-001',
         action,
         reason,

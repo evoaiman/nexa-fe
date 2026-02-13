@@ -336,26 +336,40 @@ const paymentMethodIcon = computed(() => {
               </div>
             </div>
 
-            <!-- Triage Constellation Analysis -->
+            <!-- Triage Verdict -->
             <div v-if="transaction.triage" class="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
-              <h4 class="text-sm font-semibold text-indigo-800 mb-3 flex items-center gap-2">
-                <Icon icon="lucide:brain" class="w-4 h-4" />
-                Triage Constellation Analysis
-                <span class="px-2 py-0.5 bg-indigo-200 text-indigo-700 rounded-full text-xs font-medium">
-                  {{ transaction.triage.elapsed_s.toFixed(1) }}s
-                </span>
-              </h4>
-              <p class="text-sm text-indigo-900 leading-relaxed mb-3">{{ transaction.triage.constellation_analysis }}</p>
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="text-sm font-semibold text-indigo-800 flex items-center gap-2">
+                  <Icon icon="lucide:brain" class="w-4 h-4" />
+                  AI Verdict
+                  <span class="px-2 py-0.5 bg-indigo-200 text-indigo-700 rounded-full text-xs font-medium">
+                    {{ transaction.triage.elapsed_s.toFixed(1) }}s
+                  </span>
+                </h4>
+                <div v-if="transaction.triage.decision" class="flex items-center gap-2">
+                  <span
+                    class="px-2.5 py-1 rounded-full text-xs font-bold uppercase"
+                    :class="transaction.triage.decision === 'blocked' ? 'bg-red-100 text-red-700' : transaction.triage.decision === 'escalated' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'"
+                  >
+                    {{ transaction.triage.decision }}
+                  </span>
+                  <span v-if="transaction.triage.confidence" class="text-xs text-indigo-600">
+                    {{ (transaction.triage.confidence * 100).toFixed(0) }}% confidence
+                  </span>
+                </div>
+              </div>
+              <p v-if="transaction.triage.decision_reasoning" class="text-sm text-indigo-900 leading-relaxed mb-2">
+                {{ transaction.triage.decision_reasoning }}
+              </p>
+              <p class="text-sm text-indigo-700 leading-relaxed mb-3">{{ transaction.triage.constellation_analysis }}</p>
               <div v-if="transaction.triage.assignments.length" class="flex flex-wrap gap-2">
                 <span
                   v-for="a in transaction.triage.assignments"
                   :key="a.investigator"
-                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                  :class="a.priority === 'high' ? 'bg-red-100 text-red-700' : a.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700"
                 >
                   <Icon icon="lucide:search" class="w-3 h-3" />
                   {{ a.investigator.replace('_', ' ') }}
-                  <span class="opacity-70">({{ a.priority }})</span>
                 </span>
               </div>
             </div>
