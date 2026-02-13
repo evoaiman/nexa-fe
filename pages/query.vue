@@ -60,6 +60,7 @@ const hasTableData = computed(() => messages.value.some(m => m.role === 'assista
 
 // Wire typewriter displayed text to the active assistant message
 const activeAssistantId = ref<string | null>(null)
+const hasReceivedTokens = ref(false)
 
 function getDisplayedContent(msg: QueryMessage): string {
   if (msg.role !== 'assistant') return msg.content
@@ -135,6 +136,7 @@ async function sendQuery(queryText?: string) {
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
+    hasReceivedTokens.value = false
 
     while (true) {
       const { done, value } = await reader.read()
@@ -184,6 +186,7 @@ function normalizeChartSpec(raw: unknown): ChartSpec | null {
 function handleSSEEvent(event: { type: string; [key: string]: unknown }, msg: QueryMessage) {
   switch (event.type) {
     case 'token':
+      hasReceivedTokens.value = true
       typewriter.push(event.content as string)
       break
     case 'tool_start':
@@ -200,7 +203,8 @@ function handleSSEEvent(event: { type: string; [key: string]: unknown }, msg: Qu
       break
     }
     case 'answer':
-      if (!typewriter.displayed.value && event.content) {
+      // Only push full answer as fallback when NO tokens were streamed
+      if (!hasReceivedTokens.value && event.content) {
         typewriter.push(event.content as string)
       }
       break
